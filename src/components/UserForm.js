@@ -1,69 +1,103 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import api from '../utils/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 import { Checkbox } from '../components/ui/checkbox';
 import { toast } from 'sonner';
+import roleService from '../services/roleService';
+
+/* ------------------ CONSTANTS ------------------ */
 
 const REGIONS = [
-  'Atlantic',
-  'Asia Pacific',
-  'Europe',
-  'North America',
-  'South America',
-  'Middle East',
-  'Africa',
-  'Oceania'
+  { id: 1, name: 'Atlantic' },
+  { id: 2, name: 'Asia Pacific' },
+  { id: 3, name: 'Europe' },
+  { id: 4, name: 'North America' },
+  { id: 5, name: 'South America' },
+  { id: 6, name: 'Middle East' },
+  { id: 7, name: 'Africa' },
+  { id: 8, name: 'Oceania' },
 ];
 
-const ROLES = [
-  'Super Admin',
-  'Admin / Founder',
-  'Presales Consultant',
-  'Presales Lead',
-  'Presales Manager',
-  'Sales Head',
-  'Delivery Manager'
-];
+/* ------------------ COMPONENT ------------------ */
 
 const UserForm = ({ user, onClose }) => {
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
-    role: 'Presales Consultant',
-    status: 'Active',
+    role: '',
+    roleName: '',
+    status: 'active', // Default to active
     assigned_regions: [],
   });
-  const [loading, setLoading] = useState(false);
+
   const [availableRoles, setAvailableRoles] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingRoles, setLoadingRoles] = useState(true);
+
+  /* ------------------ INIT FORM DATA ------------------ */
 
   useEffect(() => {
     if (user) {
+      // Normalize status to match the expected values in the Select component
+      const normalizedStatus = user.status 
+        ? user.status.trim().toLowerCase() === 'inactive' ? 'inactive' : 'active'
+        : 'active';
+      
       setFormData({
         full_name: user.full_name || '',
         email: user.email || '',
-        role: user.role || 'Presales Consultant',
-        status: user.status || 'Active',
-        assigned_regions: user.assigned_regions || [],
+        role: user.role_id || '',
+        roleName: user.role || '',
+        status: normalizedStatus,
+        assigned_regions: Array.isArray(user.regions)
+          ? user.regions.map((r) => r.id)
+          : [],
       });
     }
-    
-    // Fetch available roles
+  }, [user]);
+
+  /* ------------------ FETCH ROLES ------------------ */
+
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        setLoadingRoles(true);
+        const res = await roleService.getRoles();
+        const roles = res?.data || res || [];
+        setAvailableRoles(roles);
+
+        if (user) {
+          const matchedRole = roles.find(
+            (r) => r.id === user.role_id || r.name === user.role
+          );
+          if (matchedRole) {
+            setFormData((prev) => ({
+              ...prev,
+              role: matchedRole.id,
+              roleName: matchedRole.name,
+            }));
+          }
+        }
+      } catch (err) {
+        toast.error('Failed to load roles');
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
     fetchRoles();
   }, [user]);
 
-  const fetchRoles = async () => {
-    try {
-      const response = await api.get('/users/roles/config');
-      setAvailableRoles(Object.keys(response.data));
-    } catch (error) {
-      console.error('Failed to fetch roles:', error);
-      // Fallback to hardcoded roles
-      setAvailableRoles(ROLES);
-    }
-  };
+  /* ------------------ HANDLERS ------------------ */
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -71,163 +105,153 @@ const UserForm = ({ user, onClose }) => {
   };
 
   const handleRoleChange = (value) => {
-    setFormData((prev) => ({ ...prev, role: value }));
+    const selected = availableRoles.find(
+      (r) => r.id.toString() === value
+    );
+    if (selected) {
+      setFormData((prev) => ({
+        ...prev,
+        role: selected.id,
+        roleName: selected.name,
+      }));
+    }
   };
 
-  const handleStatusChange = (value) => {
-    setFormData((prev) => ({ ...prev, status: value }));
+  const handleRegionChange = (regionId, checked) => {
+    setFormData((prev) => ({
+      ...prev,
+      assigned_regions: checked
+        ? [...prev.assigned_regions, regionId]
+        : prev.assigned_regions.filter((id) => id !== regionId),
+    }));
   };
 
-  const handleRegionChange = (region, checked) => {
-    setFormData((prev) => {
-      const newRegions = checked
-        ? [...prev.assigned_regions, region]
-        : prev.assigned_regions.filter(r => r !== region);
-      return { ...prev, assigned_regions: newRegions };
-    });
-  };
+  /* ------------------ SUBMIT ------------------ */
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    console.log('Submitting user form:', formData);
-
-    // Validate required fields
-    if (!formData.full_name || !formData.email) {
-      toast.error('Please fill in all required fields');
-      setLoading(false);
-      return;
-    }
+    const payload = {
+      full_name: formData.full_name,
+      email: formData.email,
+      role: formData.roleName,
+      status: formData.status, // ✅ active / inactive
+      regions: formData.assigned_regions,
+    };
 
     try {
       if (user) {
-        await api.put(`/users/${user.id}`, formData);
+        await api.put(`/users/${user.id}`, payload);
         toast.success('User updated successfully');
       } else {
-        await api.post('/users', formData);
-        toast.success('User created successfully. Invitation email sent.');
+        await api.post('/users', payload);
+        toast.success('User created successfully');
       }
       onClose();
-    } catch (error) {
-      console.error('User form error:', error);
-      toast.error(error.response?.data?.detail || 'Failed to save user');
+    } catch (err) {
+      toast.error('Failed to save user');
     } finally {
       setLoading(false);
     }
   };
 
+  /* ------------------ UI ------------------ */
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="text-center mb-6">
-        <h2 className="text-xl font-bold text-slate-900">EMPLOYEE PROFILE & PERMISSIONS</h2>
-      </div>
+      <h2 className="text-center text-xl font-bold">
+        EMPLOYEE PROFILE & PERMISSIONS
+      </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <Label htmlFor="full_name">Full Name</Label>
+          <Label>Full Name</Label>
           <Input
-            id="full_name"
             name="full_name"
             value={formData.full_name}
             onChange={handleChange}
-            placeholder="Enter full name"
             required
-            data-testid="user-full-name-input"
           />
         </div>
+
         <div>
-          <Label htmlFor="email">Email Address</Label>
+          <Label>Email</Label>
           <Input
-            id="email"
             name="email"
             type="email"
             value={formData.email}
             onChange={handleChange}
-            placeholder="Enter email address"
             required
-            data-testid="user-email-input"
           />
         </div>
+
         <div>
-          <Label htmlFor="role">Access Role</Label>
+          <Label>Access Role</Label>
           <Select
-            value={formData.role}
+            value={formData.role?.toString()}
             onValueChange={handleRoleChange}
-            data-testid="user-role-select"
+            disabled={loadingRoles}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select role..." />
+              <SelectValue placeholder="Select role" />
             </SelectTrigger>
             <SelectContent>
-              {availableRoles.map((role) => (
-                <SelectItem key={role} value={role}>
-                  {role}
+              {availableRoles.map((r) => (
+                <SelectItem key={r.id} value={r.id.toString()}>
+                  {r.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
+
         <div>
-          <Label htmlFor="status">Current Status</Label>
+          <Label>Status</Label>
           <Select
             value={formData.status}
-            onValueChange={handleStatusChange}
-            data-testid="user-status-select"
+            onValueChange={(v) =>
+              setFormData((p) => ({ ...p, status: v }))
+            }
           >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Active">Active</SelectItem>
-              <SelectItem value="Inactive">Inactive</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
       <div>
-        <Label>Assigned Regions (SELECT MULTIPLE)</Label>
+        <Label>Assigned Regions</Label>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-          {REGIONS.map((region) => (
-            <div key={region} className="flex items-center space-x-2">
+          {REGIONS.map((r) => (
+            <div key={r.id} className="flex items-center gap-2">
               <Checkbox
-                id={`region-${region}`}
-                checked={formData.assigned_regions.includes(region)}
-                onCheckedChange={(checked) => handleRegionChange(region, checked)}
+                checked={formData.assigned_regions.includes(r.id)}
+                onCheckedChange={(c) =>
+                  handleRegionChange(r.id, c)
+                }
               />
-              <Label
-                htmlFor={`region-${region}`}
-                className="text-sm font-normal cursor-pointer"
-              >
-                {region}
-              </Label>
+              <span>{r.name}</span>
             </div>
           ))}
         </div>
-        {formData.assigned_regions.length > 0 && (
-          <div className="mt-3 text-sm text-slate-600">
-            Selected regions: {formData.assigned_regions.join(', ')}
-          </div>
-        )}
       </div>
 
-      <div className="flex justify-end gap-3 pt-6">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onClose}
-          data-testid="user-form-cancel"
-        >
+      <div className="flex justify-end gap-3">
+        <Button variant="outline" type="button" onClick={onClose}>
           Cancel
         </Button>
-        <Button
-          type="submit"
+        <Button 
+          type="submit" 
           disabled={loading}
-          data-testid="user-form-submit"
-          className="bg-[#0A2A43] hover:bg-[#0A2A43]/90"
+          className="bg-[#0A2A43] hover:bg-[#0A2A43]/90 text-white"
         >
-          {loading ? 'Saving...' : user ? 'Update' : 'Create User'}
+          {loading ? 'Saving...' : (user ? 'Update' : 'Create User')}
         </Button>
       </div>
     </form>

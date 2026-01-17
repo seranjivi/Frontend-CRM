@@ -7,64 +7,76 @@ import UserForm from '../components/UserForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { toast } from 'sonner';
 import { formatDate } from '../utils/dateUtils';
+import * as userService from '../services/userService';
+
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [activeFilters, setActiveFilters] = useState({});
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
-  const fetchUsers = async () => {
-    try {
-      console.log('Fetching users from UserManagement page...');
-      console.log('API URL:', process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000/api');
-      
-      const token = localStorage.getItem('token');
-      console.log('Token exists:', !!token);
-      console.log('Token length:', token ? token.length : 0);
-      
-      const response = await api.get('/users');
-      console.log('Users API response status:', response.status);
-      console.log('Users API response:', response);
-      console.log('Users data:', response.data);
-      console.log('Number of users:', response.data.length);
-      
-      // Check status field for each user
-      response.data.forEach(user => {
-        console.log(`User: ${user.full_name}, Status: "${user.status}"`);
-      });
-      
-      setUsers(response.data);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      console.error('Error response:', error.response);
-      console.error('Error status:', error.response?.status);
-      console.error('Error data:', error.response?.data);
-      toast.error('Failed to fetch users');
-    } finally {
-      setLoading(false);
-    }
-  };
+const fetchUsers = async () => {
+  try {
+    const response = await userService.getUsers();
+    // Ensure we're working with an array
+    const usersData = Array.isArray(response) ? response : 
+                     (response?.data ? response.data : []);
+    setUsers(usersData);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    toast.error('Failed to fetch users');
+    setUsers([]); // Ensure we set an empty array on error
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDelete = async (user) => {
-    if (window.confirm(`Are you sure you want to delete ${user.full_name}?`)) {
-      try {
-        await api.delete(`/users/${user.id}`);
-        toast.success('User deleted successfully');
-        fetchUsers();
-      } catch (error) {
-        toast.error('Failed to delete user');
-      }
+  if (window.confirm(`Are you sure you want to delete ${user.full_name}?`)) {
+    try {
+      await userService.deleteUser(user.id);
+      toast.success('User deleted successfully');
+      fetchUsers();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Failed to delete user');
     }
-  };
+  }
+};
 
-  const handleEdit = (user) => {
-    setEditingUser(user);
-    setShowForm(true);
+  const handleEdit = async (user) => {
+    try {
+      console.log('Starting to edit user:', user);
+      const response = await userService.getUserById(user.id);
+      const userData = response.data;  // Extract data from response
+      console.log('Raw user data from API:', userData);
+      
+      // Transform the data to match the expected format
+      const formattedUser = {
+        ...userData,
+        full_name: userData.full_name || userData.name || '',
+        email: userData.email || '',
+        role: userData.role_id || userData.role?.id || '',
+        role_id: userData.role_id || userData.role?.id || '',
+        role_name: userData.role_name || userData.role?.name || '',
+        status: (userData.status || 'active').toLowerCase(),
+        regions: userData.regions || userData.assigned_regions || [],
+        id: userData.id || user.id
+      };
+      
+      console.log('Formatted user data for edit:', formattedUser);
+      setEditingUser(formattedUser);
+      setShowForm(true);
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      toast.error('Failed to fetch user details');
+    }
   };
 
   const handleFormClose = () => {
@@ -74,31 +86,31 @@ const UserManagement = () => {
   };
 
   const handleToggleStatus = async (user, newStatus) => {
-    try {
-      const endpoint = newStatus === 'Active' ? 'activate' : 'deactivate';
-      await api.post(`/users/${user.id}/${endpoint}`);
-      toast.success(`User ${newStatus.toLowerCase()}d successfully`);
-      fetchUsers();
-    } catch (error) {
-      toast.error(`Failed to ${newStatus.toLowerCase()} user`);
-    }
-  };
+  try {
+    await userService.toggleUserStatus(user.id, newStatus);
+    toast.success(`User ${newStatus.toLowerCase()}d successfully`);
+    fetchUsers();
+  } catch (error) {
+    console.error(`Error toggling user status:`, error);
+    toast.error(`Failed to ${newStatus.toLowerCase()} user`);
+  }
+};
 
   const columns = [
     { key: 'full_name', header: 'Full Name' },
     { key: 'email', header: 'Email Address' },
-    { 
+    {
       key: 'role', 
       header: 'Access Role',
       render: (value) => (
-        <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+        <span className="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-700">
           {value}
         </span>
       ),
     },
     {
       key: 'assigned_regions',
-      header: 'Assigned Regions',
+      header: 'Assigned Regionss',
       render: (value) => (
         <div className="flex flex-wrap gap-1">
           {value && value.length > 0 ? (
@@ -113,18 +125,22 @@ const UserManagement = () => {
         </div>
       ),
     },
-    {
+      {
       key: 'status',
       header: 'Status',
-      render: (value) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            value === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-          }`}
-        >
-          {value}
-        </span>
-      ),
+      render: (value) => {
+        const displayStatus = value ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : '';
+        const isActive = value?.toLowerCase() === 'active';
+        return (
+          <span className={`text-sm font-medium px-2 py-1 rounded ${
+            isActive 
+              ? 'bg-[#E0FFF6] text-[#00B69B]' 
+              : 'bg-gray-100 text-gray-600'
+          }`}>
+            {displayStatus}
+          </span>
+        );
+      },
     },
     {
       key: 'created_at',
@@ -141,53 +157,76 @@ const UserManagement = () => {
     );
   }
 
+  const handleFilterChange = (key, value) => {
+    setActiveFilters(prev => ({
+      ...prev,
+      [key]: value === '' ? undefined : value
+    }));
+  };
+
+  // Apply filters to users
+  const filteredUsers = users.filter(user => {
+    if (activeFilters.status && user.status !== activeFilters.status) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-4" data-testid="user-management-page">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 font-['Manrope']">User Management</h1>
-          <p className="text-sm text-slate-600 mt-0.5">Manage user accounts and permissions</p>
-        </div>
-        <Button
-          onClick={() => setShowForm(true)}
-          data-testid="add-user-btn"
-          className="bg-[#0A2A43] hover:bg-[#0A2A43]/90 h-9 text-sm"
-        >
-          <Plus className="h-3.5 w-3.5 mr-1.5" />
-          Add User
-        </Button>
-      </div>
-
       <DataTable
-        data={users}
+        title="User Management"
+        data={filteredUsers}
         columns={columns}
-        onEdit={handleEdit}
+        showEdit={false}
         onDelete={handleDelete}
-        filterOptions={{}}
         testId="users-table"
+        filterOptions={[
+          {
+            key: 'status',
+            placeholder: 'All Status',
+            options: [
+              { value: undefined, label: 'All' },
+              { value: 'active', label: 'Active' },
+              { value: 'inactive', label: 'Inactive' }
+            ]
+          }
+        ]}
+        activeFilters={activeFilters}
+        onFilterChange={handleFilterChange}
+        onCreateNew={() => {
+          setEditingUser(null);
+          setShowForm(true);
+        }}
         customActions={(user) => (
           <div className="flex gap-2">
-            {user.status === 'Active' ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleToggleStatus(user, 'Inactive')}
-                className="text-red-600 hover:text-red-700"
-              >
-                <UserX className="h-3 w-3 mr-1" />
-                Deactivate
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleToggleStatus(user, 'Active')}
-                className="text-green-600 hover:text-green-700"
-              >
-                <UserCheck className="h-3 w-3 mr-1" />
-                Activate
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEdit(user);
+              }}
+              className="h-8 w-8 p-0 hover:bg-gray-100"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              <span className="sr-only">Edit</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(user);
+              }}
+              className="h-8 w-8 p-0 hover:bg-red-50 text-red-600 hover:text-red-700"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="sr-only">Delete</span>
+            </Button>
           </div>
         )}
       />
@@ -195,7 +234,7 @@ const UserManagement = () => {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingUser ? 'Edit User' : 'Register Member'}</DialogTitle>
+            <DialogTitle>{editingUser ? 'Edit User' : 'Add New User'}</DialogTitle>
           </DialogHeader>
           <UserForm user={editingUser} onClose={handleFormClose} />
         </DialogContent>

@@ -3,9 +3,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Search, ChevronLeft, ChevronRight, Download, Filter, Edit2, Trash2, FilterX, Eye } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Download, Filter, Edit2, Trash2, FilterX, Eye, Plus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
- 
+
 const DataTable = ({
   data = [],
   columns = [],
@@ -19,13 +19,17 @@ const DataTable = ({
   ColumnFilterComponent,
   activeFilters = [],
   onFilterChange,
-  renderToolbarActions
+  renderToolbarActions,
+  customActions,  
+  showEdit = true,
+  title = 'Data Table',
+  onCreateNew
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const itemsPerPage = 10;
- 
+
   // Apply filters
   let filteredData = data.filter((item) => {
     // Search filter
@@ -34,14 +38,19 @@ const DataTable = ({
       const value = item[col.key];
       return value?.toString().toLowerCase().includes(searchStr);
     });
- 
+
     if (!matchesSearch) return false;
- 
+
     return true;
   });
- 
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+
   // Sort data
-  const sortedData = [...filteredData].sort((a, b) => {
+  const sortedData = [...paginatedData].sort((a, b) => {
     if (!sortConfig.key) return 0;
     const aVal = a[sortConfig.key];
     const bVal = b[sortConfig.key];
@@ -49,19 +58,14 @@ const DataTable = ({
     if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
     return 0;
   });
- 
-  // Paginate data
-  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = sortedData.slice(startIndex, startIndex + itemsPerPage);
- 
+
   const handleSort = (key) => {
     setSortConfig((prev) => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
     }));
   };
- 
+
   const handleExport = () => {
     if (onExport) {
       onExport(sortedData);
@@ -82,177 +86,252 @@ const DataTable = ({
       a.click();
     }
   };
- 
+
   return (
-    <div className="space-y-3" data-testid={testId}>
-      {/* Toolbar - Compact */}
-      <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="relative flex-grow max-w-md">
-            {/* <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 h-3.5 w-3.5" />
+    <div className="space-y-4">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">
+            {title || 'Data Table'}
+            {filteredData.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                ({filteredData.length} {filteredData.length === 1 ? 'entry' : 'entries'})
+              </span>
+            )}
+          </h2>
+        </div>
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-3">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Searchs..."
+              type="search"
+              placeholder="Search..."
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              data-testid="table-search-input"
-              className="pl-9 h-8 text-sm w-full"
-            /> */}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8 w-full sm:w-[200px]"
+            />
+          </div>
+          
+          {/* Filter Dropdowns */}
+          {filterOptions && filterOptions.length > 0 && (
+            <div className="flex gap-2">
+              {filterOptions.map((filter, index) => (
+                <Select
+                  key={index}
+                  value={activeFilters[filter.key] || ''}
+                  onValueChange={(value) => 
+                    onFilterChange && onFilterChange(filter.key, value)
+                  }
+                >
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder={`${filter.placeholder || 'Filter'}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filter.options.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ))}
+            </div>
+          )}
+          
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              className="gap-1"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export CSV</span>
+            </Button>
+            
+            {onCreateNew && (
+              <Button
+                size="sm"
+                onClick={onCreateNew}
+                className="gap-1 bg-[#0A2A43] hover:bg-[#0A2A43]/90 text-white"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add User</span>
+              </Button>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {onExport && (
-            <Button variant="outline" size="sm" onClick={handleExport} className="h-8 text-xs">
-              <Download className="h-3.5 w-3.5 mr-1" />
-              Export
-            </Button>
-          )}
-          {onImport && (
-            <Button variant="outline" size="sm" onClick={onImport} className="h-8 text-xs">
-              <Download className="h-3.5 w-3.5 mr-1 rotate-180" />
-              Import
-            </Button>
-          )}
-        </div>
       </div>
- 
-      {/* Table - Compact */}
-      <div className="rounded-lg border border-slate-200 bg-white overflow-x-auto">
+      
+      <div className="rounded-md border">
         <Table>
           <TableHeader>
-            <TableRow className="bg-slate-50">
-              {columns.map((col) => (
-                <TableHead
-                  key={col.key}
-                  className="font-semibold text-slate-700 whitespace-nowrap px-4 py-2.5 text-xs"
-                >
-                  <div className="flex items-center gap-1">
-                    <div
-                      className="flex items-center gap-1 cursor-pointer hover:text-[#2C6AA6]"
-                      onClick={() => handleSort(col.key)}
-                    >
-                      <span>{col.header}</span>
-                      {sortConfig.key === col.key && (
-                        <span className="text-[#2C6AA6] font-bold">
-                          {sortConfig.direction === 'asc' ? '↑' : '↓'}
-                        </span>
-                      )}
-                    </div>
-                    {/* Column Filter Icon */}
-                    {ColumnFilterComponent && col.filterable && (
-                      <ColumnFilterComponent
-                        column={col}
-                        data={data}
-                        onFilterChange={onFilterChange}
-                        activeFilters={activeFilters}
-                      />
-                    )}
+            <TableRow>
+              {columns.map((column) => (
+                <TableHead key={column.key} className="font-bold text-gray-900 bg-blue-50">
+                  <div className="flex items-center">
+                    {column.header}
                   </div>
                 </TableHead>
               ))}
-              {(onEdit || onView || onDelete) && (
-                <TableHead className="font-semibold text-slate-700 whitespace-nowrap px-4 py-2.5 text-xs">Actions</TableHead>
+              {(onEdit || onDelete || onView || customActions) && (
+                <TableHead className="font-bold text-gray-900 bg-blue-50 text-left">Actions</TableHead>
               )}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedData.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length + 1} className="text-center py-6 text-slate-500 px-4 text-sm">
-                  No data found
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedData.map((row, index) => (
-                <TableRow key={row.id || index} className="hover:bg-slate-50/50">
-                  {columns.map((col) => (
-                    <TableCell key={col.key} className="whitespace-nowrap px-4 py-2.5 text-sm">
-                      {col.render ? col.render(row[col.key], row) : row[col.key]}
+            {sortedData.length > 0 ? (
+              sortedData.map((item, rowIndex) => (
+                <TableRow key={rowIndex}>
+                  {columns.map((column) => (
+                    <TableCell key={`${rowIndex}-${column.key}`}>
+                      {column.render
+                        ? column.render(item[column.key], item)
+                        : item[column.key]}
                     </TableCell>
                   ))}
-                  {(onEdit || onView || onDelete) && (
-                    <TableCell className="whitespace-nowrap px-4 py-2.5">
-                      <div className="flex gap-1">
-                        {onView && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onView(row)}
-                            data-testid={`view-btn-${row.id}`}
-                            className="h-7 w-7 p-0 text-blue-600 hover:text-blue-600 hover:bg-blue-50"
-                            title="View"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        {onEdit && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onEdit(row)}
-                            data-testid={`edit-btn-${row.id}`}
-                            className="h-7 w-7 p-0 text-green-600 hover:text-green-600 hover:bg-green-50"
-                            title="Edit"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        {onDelete && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onDelete(row)}
-                            data-testid={`delete-btn-${row.id}`}
-                            className="h-7 w-7 p-0 text-red-600 hover:text-red-600 hover:bg-red-50"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  )}
+                  <TableCell className="text-left">
+                    <div className="flex gap-2">
+                      {customActions ? (
+                        customActions(item)
+                      ) : (
+                        <>
+                          {onView && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => onView(item)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {showEdit && onEdit && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => onEdit(item)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {onDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => onDelete(item)}
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length + 1} className="h-24 text-center">
+                  No results found.
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
- 
-      {/* Pagination - Compact */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-slate-600">
-            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, sortedData.length)} of{' '}
-            {sortedData.length} results
-          </p>
-          <div className="flex gap-1.5">
+
+      {/* Pagination Controls */}
+      {filteredData.length > itemsPerPage && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+          <div className="text-sm text-gray-700">
+            Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
+            <span className="font-medium">
+              {Math.min(startIndex + itemsPerPage, filteredData.length)}
+            </span>{' '}
+            of <span className="font-medium">{filteredData.length}</span> entries
+          </div>
+          <div className="flex items-center space-x-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="h-8 w-8 p-0"
+            >
+              First
+            </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              data-testid="table-prev-page"
-              className="h-7 w-7 p-0"
+              className="h-8 w-8 p-0"
             >
-              <ChevronLeft className="h-3.5 w-3.5" />
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-            <div className="flex items-center px-2">
-              <span className="text-xs text-slate-600">
-                Page {currentPage} of {totalPages}
-              </span>
-            </div>
+            
+            {/* Page numbers */}
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5 || currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+              
+              if (pageNum > totalPages) return null;
+              
+              return (
+                <Button
+                  key={pageNum}
+                  variant={currentPage === pageNum ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`h-8 w-8 p-0 ${currentPage === pageNum ? 'bg-blue-600 text-white' : ''}`}
+                >
+                  {pageNum}
+                </Button>
+              );
+            })}
+            
+            {totalPages > 5 && currentPage < totalPages - 2 && (
+              <span className="px-2">...</span>
+            )}
+            
+            {totalPages > 5 && currentPage < totalPages - 2 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(totalPages)}
+                className="h-8 w-8 p-0"
+              >
+                {totalPages}
+              </Button>
+            )}
+            
             <Button
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              data-testid="table-next-page"
-              className="h-7 w-7 p-0"
+              className="h-8 w-8 p-0"
             >
-              <ChevronRight className="h-3.5 w-3.5" />
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="h-8 px-2 text-sm"
+            >
+              Last
             </Button>
           </div>
         </div>
@@ -260,5 +339,5 @@ const DataTable = ({
     </div>
   );
 };
- 
+
 export default DataTable;
