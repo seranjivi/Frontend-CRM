@@ -22,8 +22,7 @@ const DataTable = ({
   renderToolbarActions,
   customActions,  
   showEdit = true,
-  title = 'Data Table',
-  onCreateNew
+  title = 'Data Table'
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -89,80 +88,6 @@ const DataTable = ({
 
   return (
     <div className="space-y-4">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            {title || 'Data Table'}
-            {filteredData.length > 0 && (
-              <span className="ml-2 text-sm font-normal text-gray-500">
-                ({filteredData.length} {filteredData.length === 1 ? 'entry' : 'entries'})
-              </span>
-            )}
-          </h2>
-        </div>
-        <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-3">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-            <Input
-              type="search"
-              placeholder="Search..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 w-full sm:w-[200px]"
-            />
-          </div>
-          
-          {/* Filter Dropdowns */}
-          {filterOptions && filterOptions.length > 0 && (
-            <div className="flex gap-2">
-              {filterOptions.map((filter, index) => (
-                <Select
-                  key={index}
-                  value={activeFilters[filter.key] || ''}
-                  onValueChange={(value) => 
-                    onFilterChange && onFilterChange(filter.key, value)
-                  }
-                >
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder={`${filter.placeholder || 'Filter'}`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filter.options.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ))}
-            </div>
-          )}
-          
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-              className="gap-1"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Export CSV</span>
-            </Button>
-            
-            {onCreateNew && (
-              <Button
-                size="sm"
-                onClick={onCreateNew}
-                className="gap-1 bg-[#0A2A43] hover:bg-[#0A2A43]/90 text-white"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add User</span>
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
       
       <div className="rounded-md border">
         <Table>

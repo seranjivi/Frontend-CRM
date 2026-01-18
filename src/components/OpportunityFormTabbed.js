@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../utils/api';
+import opportunityService from '../services/opportunityService';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -14,8 +14,25 @@ import { toast } from 'sonner';
 import { Plus, Trash2 } from 'lucide-react';
 import MultiFileUpload from './attachments/MultiFileUpload';
 import DateField from './DateField';
+import PropTypes from 'prop-types';
 
-const OpportunityFormTabbed = ({ opportunity, onClose = null }) => {
+const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = false, showOnlyDetails = false }) => {
+  // Reset form when opportunity changes
+  useEffect(() => {
+    if (!opportunity) {
+      setFormData(defaultFormData);
+    }
+  }, [opportunity]);
+
+  // Set active tab based on showOnlyRFP or showOnlyDetails
+  useEffect(() => {
+    if (showOnlyRFP) {
+      setActiveTab('rfp');
+    } else if (showOnlyDetails) {
+      setActiveTab('details');
+    }
+  }, [showOnlyRFP, showOnlyDetails]);
+
   const [activeTab, setActiveTab] = useState('details');
   const [loading, setLoading] = useState(false);
   const [formErrors, setFormErrors] = useState({});
@@ -88,7 +105,8 @@ const OpportunityFormTabbed = ({ opportunity, onClose = null }) => {
     }
   };
 
-  const [formData, setFormData] = useState({
+  // Initialize form data with default values
+  const defaultFormData = {
     opportunity: {
       opportunity_name: '',
       clientId: '',
@@ -126,7 +144,47 @@ const OpportunityFormTabbed = ({ opportunity, onClose = null }) => {
     },
     rfpDocuments: [],
     sowDocuments: []
-  });
+  };
+
+  const [formData, setFormData] = useState(defaultFormData);
+
+  // Update form data when opportunity prop changes
+  useEffect(() => {
+    if (opportunity) {
+      setFormData({
+        opportunity: {
+          ...defaultFormData.opportunity,
+          ...(opportunity.opportunity || {}),
+          // Ensure required fields have proper defaults
+          opportunity_name: opportunity.opportunity?.opportunity_name || '',
+          client_name: opportunity.opportunity?.client_name || 'Unknown Client',
+          closeDate: opportunity.opportunity?.closeDate || '',
+          amount: opportunity.opportunity?.amount || 0,
+          currency: opportunity.opportunity?.currency || 'USD',
+          leadSource: opportunity.opportunity?.leadSource || '',
+          type: opportunity.opportunity?.type || 'New Business',
+          triaged: opportunity.opportunity?.triaged || 'Hold',
+          pipelineStatus: opportunity.opportunity?.pipelineStatus || 'Proposal Work-in-Progress',
+          winProbability: opportunity.opportunity?.winProbability || 20,
+          nextSteps: Array.isArray(opportunity.opportunity?.nextSteps) 
+            ? opportunity.opportunity.nextSteps 
+            : [],
+          createdBy: opportunity.opportunity?.createdBy || 'System',
+          id: opportunity.opportunity?.id || ''
+        },
+        rfpDetails: {
+          ...defaultFormData.rfpDetails,
+          ...(opportunity.rfpDetails || {})
+        },
+        sowDetails: {
+          ...defaultFormData.sowDetails,
+          ...(opportunity.sowDetails || {})
+        },
+        rfpDocuments: Array.isArray(opportunity.rfpDocuments) ? opportunity.rfpDocuments : [],
+        sowDocuments: Array.isArray(opportunity.sowDocuments) ? opportunity.sowDocuments : []
+      });
+    }
+  }, [opportunity]);
 
   const updateOpportunityData = (field, value) => {
     setFormData(prev => ({
@@ -181,91 +239,99 @@ const OpportunityFormTabbed = ({ opportunity, onClose = null }) => {
     return errors;
   };
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  try {
-    const isEdit = !!opportunity?.opportunityId;
-    const opportunityId = opportunity?.opportunityId;
-
-    // Format the closeDate properly
-    let closeDate = formData.opportunity.closeDate;
-    if (!closeDate) {
-      closeDate = new Date().toISOString().split('T')[0]; // Default to today if not provided
-    } else if (closeDate instanceof Date) {
-      closeDate = closeDate.toISOString().split('T')[0];
-    } else if (typeof closeDate === 'string') {
-      // Ensure we have a valid date string
-      closeDate = closeDate.split('T')[0];
-    }
-
-    // Prepare the data with all required fields
-    const opportunityData = {
-      // Required fields
-      opportunity_name: formData.opportunity.opportunity_name || 'New Opportunity',
-      client_name: formData.opportunity.client_name || 'Unknown Client',
-      clientId: formData.opportunity.clientId,
-      closeDate: closeDate, // Add the formatted date
-      amount: parseFloat(formData.opportunity.amount) || 0,
-      currency: formData.opportunity.currency || 'USD',
-      
-      // Optional fields with defaults
-      leadSource: formData.opportunity.leadSource || null,
-      type: formData.opportunity.type || 'New Business',
-      triaged: formData.opportunity.triaged !== 'Drop',
-      pipelineStatus: formData.opportunity.pipelineStatus || 'Prospecting',
-      winProbability: parseInt(formData.opportunity.winProbability) || 10,
-      nextSteps: Array.isArray(formData.opportunity.nextSteps) ? formData.opportunity.nextSteps : [],
-      createdBy: formData.opportunity.createdBy || 'system',
-    };
-
-    // For edit, include the opportunityId
-    if (isEdit) {
-      opportunityData.opportunityId = opportunityId;
-    }
-
-    console.log('Submitting opportunity data:', JSON.stringify(opportunityData, null, 2));
-
-    let result;
-    if (isEdit) {
-      const { id, createdAt, updatedAt, ...updateData } = opportunityData;
-      result = await api.put(`/opportunities/${opportunityId}`, updateData);
-    } else {
-      result = await api.post('/opportunities', opportunityData);
-    }
-
-    if (onSuccess) {
-      onSuccess(result.data);
-    }
-    toast.success(`Opportunity ${isEdit ? 'updated' : 'created'} successfully!`);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
-  } catch (error) {
-    console.error('Error saving opportunity:', error);
-    let errorMessage = 'Failed to save opportunity';
-    
-    if (error.response) {
-      console.error('Error response data:', error.response.data);
-      if (Array.isArray(error.response.data?.detail)) {
-        errorMessage = error.response.data.detail.map(d => d.msg || JSON.stringify(d)).join(', ');
-      } else if (error.response.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.response.data?.detail) {
-        errorMessage = typeof error.response.data.detail === 'string' 
-          ? error.response.data.detail 
-          : JSON.stringify(error.response.data.detail);
+    try {
+      const isEdit = !!opportunity?.id || !!opportunity?.opportunity?.id;
+      const opportunityId = opportunity?.id || opportunity?.opportunity?.id;
+
+      // Format the closeDate properly
+      let closeDate = formData.opportunity.closeDate;
+      if (!closeDate) {
+        closeDate = new Date().toISOString().split('T')[0]; // Default to today if not provided
+      } else if (closeDate instanceof Date) {
+        closeDate = closeDate.toISOString().split('T')[0];
+      } else if (typeof closeDate === 'string') {
+        // Ensure we have a valid date string
+        closeDate = closeDate.split('T')[0];
       }
-      console.error('Status:', error.response.status);
-    } else if (error.request) {
-      console.error('No response received:', error.request);
-      errorMessage = 'No response from server';
-    } else {
-      console.error('Error:', error.message);
-      errorMessage = error.message;
+
+      // Prepare the data with all required fields
+      const opportunityData = {
+        // Required fields
+        opportunity_name: formData.opportunity.opportunity_name || 'New Opportunity',
+        client_name: formData.opportunity.client_name || 'Unknown Client',
+        client_id: formData.opportunity.clientId,
+        close_date: closeDate,
+        amount: parseFloat(formData.opportunity.amount) || 0,
+        amount_currency: formData.opportunity.currency || 'USD',
+        
+        // Optional fields with defaults
+        lead_source: formData.opportunity.leadSource || null,
+        opportunity_type: formData.opportunity.type || 'New Business',
+        triaged_status: formData.opportunity.triaged === 'Proceed' ? 'Proceed' : 
+                       (formData.opportunity.triaged === 'Drop' ? 'Drop' : 'Hold'),
+        pipeline_status: formData.opportunity.pipelineStatus || 'Proposal Work-in-Progress',
+        win_probability: parseInt(formData.opportunity.winProbability) || 20,
+        user_name: formData.opportunity.createdBy || 'System'
+      };
+
+      console.log('Submitting opportunity data:', JSON.stringify({
+        isEdit,
+        opportunityId,
+        ...opportunityData
+      }, null, 2));
+
+      let result;
+      if (isEdit) {
+        // For update, make sure we're using the correct ID
+        const updateId = opportunityId || formData.opportunity.id;
+        if (!updateId) {
+          throw new Error('No opportunity ID provided for update');
+        }
+        result = await opportunityService.updateOpportunity(updateId, opportunityData);
+        toast.success('Opportunity updated successfully!');
+      } else {
+        // For create
+        result = await opportunityService.createOpportunity(opportunityData);
+        toast.success('Opportunity created successfully!');
+      }
+
+      if (onSuccess && typeof onSuccess === 'function') {
+        onSuccess(result.data);
+      }
+      
+      if (onClose) onClose();
+      
+    } catch (error) {
+      console.error('Error saving opportunity:', error);
+      let errorMessage = 'Failed to save opportunity';
+      
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        if (Array.isArray(error.response.data?.detail)) {
+          errorMessage = error.response.data.detail.map(d => d.msg || JSON.stringify(d)).join(', ');
+        } else if (error.response.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.response.data?.detail) {
+          errorMessage = typeof error.response.data.detail === 'string' 
+            ? error.response.data.detail 
+            : JSON.stringify(error.response.data.detail);
+        }
+        console.error('Status:', error.response.status);
+      } else if (error.request) {
+        console.error('No response received:', error.request);
+        errorMessage = 'No response from server';
+      } else {
+        console.error('Error:', error.message);
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     }
-    
-    toast.error(errorMessage);
-  }
-};
+  };
+
   const handleClientSelect = (client) => {
     updateOpportunityData('clientId', client._id || client.id);
     updateOpportunityData('client_name', client.client_name || client.name);
@@ -297,9 +363,8 @@ const OpportunityFormTabbed = ({ opportunity, onClose = null }) => {
     setHasFetchedClients(true);
 
     try {
-      const response = await api.get('/clients');
+      const response = await opportunityService.getClients();
 
-      
       // Ensure we have valid client data
       const clientsData = Array.isArray(response.data) 
         ? response.data 
@@ -331,8 +396,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose = null }) => {
       if (opportunity?.opportunityId) {
         try {
           setLoading(true);
-          const response = await api.get(`/opportunities/${opportunity.opportunityId}`);
-          const data = response.data;
+          const data = await opportunityService.getOpportunityById(opportunity.opportunityId);
 
           setFormData({
             opportunity: data.opportunity || formData.opportunity,
@@ -411,13 +475,24 @@ const OpportunityFormTabbed = ({ opportunity, onClose = null }) => {
           </div>
         </div>
       )}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={!showOnlyRFP && !showOnlyDetails ? setActiveTab : undefined} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="rfp" disabled={!formData.opportunity.opportunityId && !opportunity?.opportunityId}>
+          <TabsTrigger 
+            value="details" 
+            disabled={showOnlyRFP}
+          >
+            Details
+          </TabsTrigger>
+          <TabsTrigger 
+            value="rfp"
+            disabled={showOnlyDetails}
+          >
             RFP Details
           </TabsTrigger>
-          <TabsTrigger value="sow" disabled={!formData.opportunity.opportunityId && !opportunity?.opportunityId}>
+          <TabsTrigger 
+            value="sow" 
+            disabled={showOnlyRFP || showOnlyDetails}
+          >
             SOW Details
           </TabsTrigger>
         </TabsList>
@@ -498,25 +573,25 @@ const OpportunityFormTabbed = ({ opportunity, onClose = null }) => {
                               </div>
                             ) : (
                             clients.map((client) => (
-  <div
-    key={client.id}
-    className="cursor-pointer select-none rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
-    onClick={() => {
-      handleClientSelect({
-        _id: client.id,
-        client_name: client.client_name,
-        email: client.contact_email,
-        phone: '', // Add phone if available
-        companyName: client.client_name
-      });
-      setIsClientDropdownOpen(false);
-    }}
-  >
-    <div className="font-medium">
-      {client.client_name}
-    </div>
-  </div>
-))
+                              <div
+                                key={client.id}
+                                className="cursor-pointer select-none rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                                onClick={() => {
+                                  handleClientSelect({
+                                    _id: client.id,
+                                    client_name: client.client_name,
+                                    email: client.contact_email,
+                                    phone: '', // Add phone if available
+                                    companyName: client.client_name
+                                  });
+                                  setIsClientDropdownOpen(false);
+                                }}
+                              >
+                                <div className="font-medium">
+                                  {client.client_name}
+                                </div>
+                              </div>
+                            ))
                             )}
                           </div>
                         </div>
@@ -557,23 +632,23 @@ const OpportunityFormTabbed = ({ opportunity, onClose = null }) => {
                         <p className="text-sm text-red-600 mb-1">{formErrors.closeDate}</p>
                       )}
                       <input
-    type="date"
-    value={formData.opportunity.closeDate ? new Date(formData.opportunity.closeDate).toISOString().split('T')[0] : ''}
-    onChange={(e) => {
-      const selectedDate = e.target.value ? new Date(e.target.value).toISOString() : '';
-      updateOpportunityData('closeDate', selectedDate);
-      if (formErrors.closeDate) {
-        setFormErrors(prev => {
-          const newErrors = { ...prev };
-          delete newErrors.closeDate;
-          return newErrors;
-        });
-      }
-    }}
-    min={new Date().toISOString().split('T')[0]}
-    className={`w-full p-2 border rounded ${formErrors.closeDate ? 'border-red-500' : 'border-gray-300'}`}
-    required
-  />
+                        type="date"
+                        value={formData.opportunity.closeDate ? new Date(formData.opportunity.closeDate).toISOString().split('T')[0] : ''}
+                        onChange={(e) => {
+                          const selectedDate = e.target.value ? new Date(e.target.value).toISOString() : '';
+                          updateOpportunityData('closeDate', selectedDate);
+                          if (formErrors.closeDate) {
+                            setFormErrors(prev => {
+                              const newErrors = { ...prev };
+                              delete newErrors.closeDate;
+                              return newErrors;
+                            });
+                          }
+                        }}
+                        min={new Date().toISOString().split('T')[0]}
+                        className={`w-full p-2 border rounded ${formErrors.closeDate ? 'border-red-500' : 'border-gray-300'}`}
+                        required
+                      />
                     </div>
                   </div>
 
@@ -1138,7 +1213,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose = null }) => {
                   {opportunity ? 'Updating...' : 'Creating...'}
                 </>
               ) : (
-                <>{opportunity ? 'Update Opportunity' : 'Create Opportunity'}</>
+                <>{activeTab === 'rfp' ? 'Add RFB' : (opportunity ? 'Update Opportunity' : 'Create Opportunity')}</>
               )}
             </Button>
           </div>
@@ -1146,6 +1221,17 @@ const OpportunityFormTabbed = ({ opportunity, onClose = null }) => {
       </Tabs>
     </div>
   );
+};
+
+OpportunityFormTabbed.propTypes = {
+  showOnlyRFP: PropTypes.bool,
+  showOnlyDetails: PropTypes.bool,
+  opportunity: PropTypes.shape({
+    opportunityId: PropTypes.string,
+    // Add other opportunity properties as needed
+  }),
+  onClose: PropTypes.func,
+  onSuccess: PropTypes.func
 };
 
 export default OpportunityFormTabbed;

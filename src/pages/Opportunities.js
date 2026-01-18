@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import api from '../utils/api';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import opportunityService from '../services/opportunityService';
 import { Button } from '../components/ui/button';
-import { Plus, ArrowRight, Filter, Upload, Download, Search } from 'lucide-react';
+import { Plus, ArrowRight, Filter, Upload, Download, Search, CheckCircle } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import OpportunityFormTabbed from '../components/OpportunityFormTabbed';
 import AttachmentCell from '../components/attachments/AttachmentCell';
@@ -11,6 +12,7 @@ import { toast } from 'sonner';
 import { formatDate } from '../utils/dateUtils';
 import { saveAs } from 'file-saver';
 import { Input } from '../components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 const Opportunities = () => {
   const [opportunities, setOpportunities] = useState([]);
@@ -19,6 +21,8 @@ const Opportunities = () => {
   const [editingOpportunity, setEditingOpportunity] = useState(null);
   const [showAttachments, setShowAttachments] = useState(false);
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
+  const [isRFPView, setIsRFPView] = useState(false);
+  const [showOnlyDetails, setShowOnlyDetails] = useState(false);
   const fileInputRef = useRef(null);
 
   // State for filters
@@ -26,8 +30,12 @@ const Opportunities = () => {
     opportunityName: 'All Opportunities',
     status: 'All Status',
     client: 'All Clients',
-    closeDate: 'All Dates'
+    closeDate: 'All Dates',
+    type: 'All Opportunities'
   });
+
+  const statusOptions = ['All Status', 'Active', 'Inactive', 'Won', 'Lost', 'In Progress'];
+  const [opportunityTypeOptions, setOpportunityTypeOptions] = useState(['All Opportunities']);
 
   // Handle filter changes
   const handleFilterChange = (filterName, value) => {
@@ -37,13 +45,35 @@ const Opportunities = () => {
     }));
   };
 
+  // Filter opportunities based on all active filters
+  const filteredOpportunities = useMemo(() => {
+    return opportunities.filter(opp => {
+      // Filter by opportunity name (search)
+      const matchesSearch = filters.opportunityName === 'All Opportunities' || 
+        !filters.opportunityName ||
+        (opp.opportunity_name && 
+         opp.opportunity_name.toLowerCase().includes(filters.opportunityName.toLowerCase()));
+      
+      // Filter by status
+      const matchesStatus = filters.status === 'All Status' || 
+        (opp.status && opp.status === filters.status);
+      
+      // Filter by opportunity type (using opportunity_name as type)
+      const matchesType = filters.type === 'All Opportunities' || 
+        (opp.opportunity_name && opp.opportunity_name === filters.type);
+      
+      return matchesSearch && matchesStatus && matchesType;
+    });
+  }, [opportunities, filters]);
+
   // Clear all filters
   const clearFilters = () => {
     setFilters({
       opportunityName: 'All Opportunities',
       status: 'All Status',
       client: 'All Clients',
-      closeDate: 'All Dates'
+      closeDate: 'All Dates',
+      type: 'All Opportunities'
     });
   };
 
@@ -144,21 +174,44 @@ const Opportunities = () => {
     }
   ];
 
+  const fetchOpportunities = async () => {
+    try {
+      setLoading(true);
+      const response = await opportunityService.getOpportunities();
+      setOpportunities(response.data || []);
+    } catch (error) {
+      console.error('Error fetching opportunities:', error);
+      toast.error('Failed to load opportunities');
+      // Fallback to sample data if API fails
+      setOpportunities(sampleData);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Always use sample data for demonstration
-    setOpportunities(sampleData);
-    setLoading(false);
+    fetchOpportunities();
   }, []);
 
-  // Mock fetchOpportunities function that's still used by other parts of the component
-  const fetchOpportunities = async () => {
-    return { data: sampleData };
-  };
+  // Update opportunity type options when opportunities data changes
+  useEffect(() => {
+    if (opportunities && opportunities.length > 0) {
+      // Get unique opportunity names from the data
+      const uniqueOpportunityNames = [...new Set(
+        opportunities
+          .map(opp => opp.opportunity_name)
+          .filter(Boolean) // Remove any undefined/null values
+      )];
+      
+      // Keep 'All Opportunities' as first option, then add the unique names
+      setOpportunityTypeOptions(['All Opportunities', ...uniqueOpportunityNames]);
+    }
+  }, [opportunities]);
 
   const handleDelete = async (opportunity) => {
     if (window.confirm(`Are you sure you want to delete this opportunity?`)) {
       try {
-        await api.delete(`/opportunity-collections/opportunities/${opportunity.id}`);
+        await opportunityService.deleteOpportunity(opportunity.id);
         toast.success('Opportunity deleted successfully');
         fetchOpportunities();
       } catch (error) {
@@ -167,18 +220,104 @@ const Opportunities = () => {
     }
   };
 
-  const handleEdit = (opportunity) => {
-    setEditingOpportunity(opportunity);
-    setShowForm(true);
+  const handleEdit = async (opportunity) => {
+    try {
+      setLoading(true);
+      setIsRFPView(false); // Not in RFP view when using edit
+      setShowOnlyDetails(true); // Show only Details tab when editing
+      // Fetch the latest opportunity data by ID
+      const response = await opportunityService.getOpportunityById(opportunity.id || opportunity.opportunity_id);
+      
+      console.log('API Response:', response); // Debug log
+      
+      // The API response has the data in response.data
+      const apiData = response.data?.data || opportunity;
+      console.log('API Data:', apiData); // Debug log
+      
+      // Format the data to match the form's expected structure
+      const formattedData = {
+        opportunity: {
+          opportunity_name: apiData.opportunity_name || '',
+          clientId: apiData.client_id || '',
+          client_name: apiData.client_name || 'Unknown Client',
+          closeDate: apiData.close_date ? new Date(apiData.close_date).toISOString().split('T')[0] : '',
+          amount: parseFloat(apiData.amount) || 0,
+          currency: apiData.amount_currency || 'USD',
+          leadSource: apiData.lead_source || '',
+          type: apiData.opportunity_type || 'New Business',
+          triaged: apiData.triaged_status || 'Hold',
+          pipelineStatus: apiData.pipeline_status || 'Proposal Work-in-Progress',
+          winProbability: apiData.win_probability || 20,
+          nextSteps: [], // Default empty array for next steps
+          createdBy: apiData.user_name || 'System',
+          description: '',
+          id: apiData.id || opportunity.id || ''
+        },
+        rfpDetails: {
+          rfpTitle: '',
+          rfpStatus: 'Draft',
+          submissionDeadline: '',
+          bidManager: '',
+          submissionMode: '',
+          portalUrl: '',
+          qaLogs: []
+        },
+        sowDetails: {
+          sowTitle: '',
+          sowStatus: 'Draft',
+          contractValue: 0,
+          currency: apiData.amount_currency || 'USD',
+          targetKickoffDate: '',
+          linkedProposalRef: '',
+          scopeOverview: ''
+        },
+        rfpDocuments: [],
+        sowDocuments: []
+      };
+      
+      console.log('Formatted Data for Form:', formattedData); // Debug log
+      
+      setEditingOpportunity(formattedData);
+      setShowForm(true);
+    } catch (error) {
+      console.error('Error fetching opportunity details:', error);
+      toast.error('Failed to load opportunity details');
+      // Fallback to the existing opportunity data if API call fails
+      setEditingOpportunity(opportunity);
+      setShowForm(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFormClose = () => {
     setShowForm(false);
-    setEditingOpportunity(null);
+    // Add a small delay to allow the modal animation to complete before resetting the form
+    setTimeout(() => {
+      setEditingOpportunity(null);
+      setIsRFPView(false); // Reset RFP view state when closing the form
+      setShowOnlyDetails(false); // Reset showOnlyDetails state when closing the form
+    }, 100);
     fetchOpportunities();
   };
 
- 
+  // Handle the dialog's open change to ensure form resets when closed via X or clicking outside
+  const handleDialogOpenChange = (open) => {
+    if (!open) {
+      handleFormClose();
+    } else {
+      setShowForm(true);
+    }
+  };
+
+  const navigate = useNavigate();
+
+  const handleView = (opportunity) => {
+    // Open the form in RFB-only mode
+    setIsRFPView(true);
+    setEditingOpportunity(opportunity);
+    setShowForm(true);
+  };
 
   const handleViewAttachments = (opportunity) => {
     setSelectedOpportunity(opportunity);
@@ -247,6 +386,7 @@ const Opportunities = () => {
             size="sm"
             onClick={() => handleEdit(row)}
             className="h-8 w-8 p-0"
+            title="Edit"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -258,11 +398,21 @@ const Opportunities = () => {
             size="sm"
             onClick={() => handleDelete(row)}
             className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
+            title="Delete"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
             </svg>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleView(row)}
+            className="h-8 text-xs whitespace-nowrap"
+            title="Level 2 Approval – RFB"
+          >
+            Level 2 Approval – RFB
           </Button>
         </div>
       )
@@ -287,7 +437,10 @@ const Opportunities = () => {
     <div className="space-y-4" data-testid="opportunities-page">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 font-['Manrope']">Opportunities</h1>
+          <div className="flex items-baseline space-x-2">
+            <h1 className="text-2xl font-bold text-slate-900 font-['Manrope']">Opportunities</h1>
+            <span className="text-sm text-slate-500">({filteredOpportunities.length} records)</span>
+          </div>
           <p className="text-sm text-slate-600 mt-0.5">Manage sales opportunities and track progress</p>
         </div>
         <div className="flex items-center space-x-4">
@@ -295,17 +448,46 @@ const Opportunities = () => {
             <Search className="absolute left-3 h-4 w-4 text-gray-500" />
             <Input
               type="search"
-              placeholder="Search"
-              className="pl-9 w-[200px] text-sm"
+              placeholder="Search..."
+              className="pl-9 w-[180px] text-sm"
+              value={filters.opportunityName === 'All Opportunities' ? '' : filters.opportunityName}
+              onChange={(e) => handleFilterChange('opportunityName', e.target.value)}
             />
-            <Button 
-              variant="outline" 
-              className="h-9 text-gray-700 border-gray-300 whitespace-nowrap"
-              onClick={handleDownloadTemplate}
+            
+            {/* Status Filter */}
+            <Select 
+              value={filters.status} 
+              onValueChange={(value) => handleFilterChange('status', value)}
             >
-              <Download className="mr-2 h-4 w-4" />
-              Sample Template
-            </Button>
+              <SelectTrigger className="w-[130px] h-9 text-sm">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {/* Opportunity Type Filter */}
+            <Select 
+              value={filters.type} 
+              onValueChange={(value) => handleFilterChange('type', value)}
+            >
+              <SelectTrigger className="w-[150px] h-9 text-sm">
+                <SelectValue placeholder="All Opportunities" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px] overflow-y-auto">
+                {opportunityTypeOptions.map((type) => (
+                  <SelectItem key={type} value={type} className="text-sm">
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
             <div className="relative">
               <Button 
                 variant="outline" 
@@ -333,7 +515,12 @@ const Opportunities = () => {
             </Button>
           </div>
           <Button
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              setIsRFPView(false); // Not in RFP view when adding new opportunity
+              setShowOnlyDetails(true); // Show only Details tab when adding new opportunity
+              setEditingOpportunity(null);
+              setShowForm(true);
+            }}
             data-testid="add-opportunity-btn"
             className="bg-[#0A2A43] hover:bg-[#0A2A43]/90 h-9 text-sm"
           >
@@ -343,86 +530,25 @@ const Opportunities = () => {
         </div>
       </div>
 
-      <div className="flex justify-between items-center mb-4 p-4 bg-white rounded-lg border border-gray-200">
-        <div className="flex items-end space-x-6">
-          <div className="flex flex-col">
-            <label className="text-sm font-medium text-gray-700 mb-1">Opportunity Name</label>
-            <select 
-              className="text-sm border border-gray-300 rounded-md px-3 py-1.5 w-48 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 h-9"
-              value={filters.opportunityName}
-              onChange={(e) => handleFilterChange('opportunityName', e.target.value)}
-            >
-              <option>All Opportunities</option>
-              {Array.from(new Set(opportunities.map(opp => opp.opportunity_name))).map((name, index) => (
-                <option key={index} value={name}>{name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col">
-            <label className="text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select 
-              className="text-sm border border-gray-300 rounded-md px-3 py-1.5 w-40 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 h-9"
-              value={filters.status}
-              onChange={(e) => handleFilterChange('status', e.target.value)}
-            >
-              <option>All Status</option>
-              <option>Active</option>
-              <option>Closed</option>
-              <option>Won</option>
-              <option>Lost</option>
-            </select>
-          </div>
-          <div className="flex flex-col">
-            <label className="text-sm font-medium text-gray-700 mb-1">Client</label>
-            <select 
-              className="text-sm border border-gray-300 rounded-md px-3 py-1.5 w-40 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 h-9"
-              value={filters.client}
-              onChange={(e) => handleFilterChange('client', e.target.value)}
-            >
-              <option>All Clients</option>
-              {Array.from(new Set(opportunities.map(opp => opp.client_name))).map((client, index) => (
-                <option key={index} value={client}>{client}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col">
-            <label className="text-sm font-medium text-gray-700 mb-1">Close Date</label>
-            <select 
-              className="text-sm border border-gray-300 rounded-md px-3 py-1.5 w-44 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 h-9"
-              value={filters.closeDate}
-              onChange={(e) => handleFilterChange('closeDate', e.target.value)}
-            >
-              <option>All Dates</option>
-              <option>This Week</option>
-              <option>This Month</option>
-              <option>Next Month</option>
-              <option>Past Due</option>
-            </select>
-          </div>
-          <Button 
-            variant="outline" 
-            className="text-gray-700 border-gray-300 hover:bg-gray-50 h-9"
-            onClick={clearFilters}
-          >
-            Clear Filters
-          </Button>
-        </div>
-      </div>
-
       <DataTable
-        data={opportunities}
+        data={filteredOpportunities}
         columns={columns}
         // onImport={handleImport}
         filterOptions={filterOptions}
         testId="opportunities-table"
       />
  
-      <Dialog open={showForm} onOpenChange={setShowForm}>
+      <Dialog open={showForm} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingOpportunity ? 'Edit Opportunity' : 'Add New Opportunity'}</DialogTitle>
+            <DialogTitle>{isRFPView ? 'RFP Details' : editingOpportunity ? 'Edit Opportunity' : 'Add New Opportunity'}</DialogTitle>
           </DialogHeader>
-          <OpportunityFormTabbed opportunity={editingOpportunity} onClose={handleFormClose} />
+          <OpportunityFormTabbed 
+            opportunity={editingOpportunity} 
+            onClose={handleFormClose} 
+            showOnlyRFP={isRFPView}
+            showOnlyDetails={showOnlyDetails}
+          />
         </DialogContent>
       </Dialog>
  
@@ -437,4 +563,3 @@ const Opportunities = () => {
 };
  
 export default Opportunities;
- 

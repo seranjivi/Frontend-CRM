@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { Button } from '../components/ui/button';
-import { Plus, Edit, Trash2, UserCheck, UserX } from 'lucide-react';
+import { Plus, Edit, Trash2, UserCheck, UserX, Download } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import UserForm from '../components/UserForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
@@ -166,16 +166,110 @@ const fetchUsers = async () => {
 
   // Apply filters to users
   const filteredUsers = users.filter(user => {
+    // Status filter
     if (activeFilters.status && user.status !== activeFilters.status) {
       return false;
     }
+    
+    // Search filter
+    if (activeFilters.search) {
+      const searchTerm = activeFilters.search.toLowerCase();
+      const userFullName = user.full_name?.toLowerCase() || '';
+      const userEmail = user.email?.toLowerCase() || '';
+      
+      if (!userFullName.includes(searchTerm) && !userEmail.includes(searchTerm)) {
+        return false;
+      }
+    }
+    
     return true;
   });
 
   return (
     <div className="space-y-4" data-testid="user-management-page">
+      <div className="flex justify-between items-center">
+        <div className="flex items-baseline gap-4">
+          <h1 className="text-2xl font-bold text-slate-900 font-['Manrope']">User Management</h1>
+          <span className="text-sm text-gray-500 -mb-0.5">
+            ({filteredUsers.length} Records)
+          </span>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={activeFilters.search || ''}
+              onChange={(e) => handleFilterChange('search', e.target.value || undefined)}
+              className="text-sm border border-gray-300 rounded-md pl-9 pr-3 py-1.5 w-60 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <svg
+              className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Status:</span>
+            <select
+              value={activeFilters.status || ''}
+              onChange={(e) => handleFilterChange('status', e.target.value || undefined)}
+              className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              // Handle CSV export
+              const csvContent = [
+                columns.map(col => `"${col.header}"`).join(','),
+                ...filteredUsers.map(user => 
+                  columns.map(col => 
+                    `"${(user[col.key] || '').toString().replace(/"/g, '""')}"`
+                  ).join(',')
+                )
+              ].join('\n');
+              
+              const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `users_${new Date().toISOString().split('T')[0]}.csv`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
+            className="h-9 text-sm border-gray-300"
+          >
+            <Download className="h-3.5 w-3.5 mr-1.5" />
+            Export CSV
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingUser(null);
+              setShowForm(true);
+            }}
+            className="bg-[#0A2A43] hover:bg-[#0A2A43]/90 h-9 text-sm"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            Add User
+          </Button>
+        </div>
+      </div>
       <DataTable
-        title="User Management"
         data={filteredUsers}
         columns={columns}
         showEdit={false}
