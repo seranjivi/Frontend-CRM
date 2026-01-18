@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import opportunityService from '../services/opportunityService';
+import rfpService from '../services/rfpService';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -243,6 +244,29 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     e.preventDefault();
     
     try {
+      // Handle RFP creation if in RFP tab
+      if (activeTab === 'rfp') {
+        const rfpData = {
+          opportunityName: formData.opportunity.opportunity_name || 'New RFP',
+          rfpTitle: formData.opportunity.opportunity_name || 'New RFP',
+          rfpStatus: 'Draft',
+          rfpManager: formData.opportunity.assignedTo || '',
+          submissionDeadline: formData.opportunity.closeDate || new Date().toISOString().split('T')[0],
+          opportunityId: opportunity?.id || opportunity?.opportunity?.id
+        };
+
+        const result = await rfpService.createRFP(rfpData);
+        toast.success('RFP created successfully!');
+        
+        if (onSuccess && typeof onSuccess === 'function') {
+          onSuccess(result);
+        }
+        
+        if (onClose) onClose();
+        return;
+      }
+
+      // Original opportunity creation/update logic
       const isEdit = !!opportunity?.id || !!opportunity?.opportunity?.id;
       const opportunityId = opportunity?.id || opportunity?.opportunity?.id;
 
@@ -1067,7 +1091,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
               <CardContent>
                 <MultiFileUpload
                   files={formData.rfpDocuments}
-                  onFilesChange={(files) => setFormData(prev => ({ ...prev, rfpDocuments: files }))}
+                  onChange={(files) => setFormData(prev => ({ ...prev, rfpDocuments: files }))}
                   allowedTypes={['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']}
                   maxSize={10 * 1024 * 1024} // 10MB
                 />
@@ -1193,7 +1217,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
               <CardContent>
                 <MultiFileUpload
                   files={formData.sowDocuments}
-                  onFilesChange={(files) => setFormData(prev => ({ ...prev, sowDocuments: files }))}
+                  onChange={(files) => setFormData(prev => ({ ...prev, sowDocuments: files }))}
                   allowedTypes={['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']}
                   maxSize={10 * 1024 * 1024} // 10MB
                 />

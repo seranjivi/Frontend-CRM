@@ -2,6 +2,22 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '../components/ui/button';
 import { Filter, Upload, Download, Search, Bell, Plus, Eye, Edit, Trash2, Loader2 } from 'lucide-react';
 import { Input } from '../components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import { Label } from '../components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 import { saveAs } from 'file-saver';
 import DataTable from '../components/DataTable';
 import rfpService from '../services/rfpService';
@@ -11,6 +27,14 @@ const RFPDetails = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isAddRFPDialogOpen, setIsAddRFPDialogOpen] = useState(false);
+  const [newRFP, setNewRFP] = useState({
+    opportunityName: '',
+    rfpTitle: '',
+    rfpStatus: 'Draft',
+    rfpManager: '',
+    submissionDeadline: new Date().toISOString().split('T')[0]
+  });
 
   // Fetch RFPs on component mount
   useEffect(() => {
@@ -18,8 +42,13 @@ const RFPDetails = () => {
       try {
         setLoading(true);
         const response = await rfpService.getRFPs();
-        // Transform the API response to match our table structure if needed
-        const formattedData = response.map(item => ({
+        console.log('API Response:', response); // Log the response for debugging
+        
+        // Check if the response is an array, if not, use response.data or fallback to empty array
+        const responseData = Array.isArray(response) ? response : 
+                          (response?.data && Array.isArray(response.data) ? response.data : []);
+        
+        const formattedData = responseData.map(item => ({
           id: item.id,
           opportunityName: item.opportunityName || 'N/A',
           rfpTitle: item.rfpTitle || 'N/A',
@@ -28,6 +57,7 @@ const RFPDetails = () => {
           submissionDeadline: item.submissionDeadline || 'N/A',
           createdOn: item.createdOn || new Date().toISOString().split('T')[0]
         }));
+        
         setData(formattedData);
       } catch (err) {
         console.error('Error fetching RFPs:', err);
@@ -198,6 +228,69 @@ const RFPDetails = () => {
     }
   };
 
+  const fetchOpportunities = async () => {
+    try {
+      setIsLoadingOpportunities(true);
+      const response = await opportunityService.getOpportunities();
+      setOpportunities(Array.isArray(response) ? response : (response?.data || []));
+    } catch (error) {
+      console.error('Error fetching opportunities:', error);
+      toast.error('Failed to load opportunities');
+    } finally {
+      setIsLoadingOpportunities(false);
+    }
+  };
+
+  const handleAddRFP = async () => {
+    try {
+      await rfpService.createRFP(newRFP);
+      // Refresh the RFP list
+      fetchRFPs();
+      // Close the dialog
+      setIsAddRFPDialogOpen(false);
+      // Reset form
+      setNewRFP({
+        opportunityName: '',
+        rfpTitle: '',
+        rfpStatus: 'Draft',
+        rfpManager: '',
+        submissionDeadline: new Date().toISOString().split('T')[0]
+      });
+      toast.success('RFP created successfully');
+    } catch (error) {
+      console.error('Error creating RFP:', error);
+      toast.error('Failed to create RFP');
+    }
+  };
+
+  // Add this function to fetch RFPs
+  const fetchRFPs = async () => {
+    try {
+      setLoading(true);
+      const response = await rfpService.getRFPs();
+      const responseData = Array.isArray(response) ? response : 
+                        (response?.data && Array.isArray(response.data) ? response.data : []);
+      
+      const formattedData = responseData.map(item => ({
+        id: item.id,
+        opportunityName: item.opportunityName || 'N/A',
+        rfpTitle: item.rfpTitle || 'N/A',
+        rfpStatus: item.rfpStatus || 'Draft',
+        rfpManager: item.rfpManager || 'N/A',
+        submissionDeadline: item.submissionDeadline || 'N/A',
+        createdOn: item.createdOn || new Date().toISOString().split('T')[0]
+      }));
+      
+      setData(formattedData);
+    } catch (err) {
+      console.error('Error fetching RFPs:', err);
+      setError('Failed to load RFP data. Please try again later.');
+      toast.error('Failed to load RFP data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Custom actions for the table
   const customActions = (item) => (
     <div className="flex items-center space-x-1">
@@ -258,6 +351,124 @@ const RFPDetails = () => {
     );
   }
 
+  // Add RFP Dialog Component
+  const AddRFPDialog = () => (
+    <Dialog open={isAddRFPDialogOpen} onOpenChange={setIsAddRFPDialogOpen}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Add New RFP</DialogTitle>
+          <DialogDescription>
+            Fill in the details to create a new RFP.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="opportunityName" className="text-right">
+              Opportunity Name
+            </Label>
+            <Input
+              id="opportunityName"
+              value={newRFP.opportunityName}
+              onChange={(e) => setNewRFP({...newRFP, opportunityName: e.target.value})}
+              className="col-span-3"
+              placeholder="Enter opportunity name"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="rfpTitle" className="text-right">
+              RFP Title
+            </Label>
+            <Input
+              id="rfpTitle"
+              value={newRFP.rfpTitle}
+              onChange={(e) => setNewRFP({...newRFP, rfpTitle: e.target.value})}
+              className="col-span-3"
+              placeholder="Enter RFP title"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="rfpStatus" className="text-right">
+              Status
+            </Label>
+            <Select
+              value={newRFP.rfpStatus}
+              onValueChange={(value) => setNewRFP({...newRFP, rfpStatus: value})}
+            >
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Draft">Draft</SelectItem>
+                <SelectItem value="In Progress">In Progress</SelectItem>
+                <SelectItem value="Submitted">Submitted</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="rfpManager" className="text-right">
+              RFP Manager
+            </Label>
+            <Input
+              id="rfpManager"
+              value={newRFP.rfpManager}
+              onChange={(e) => setNewRFP({...newRFP, rfpManager: e.target.value})}
+              className="col-span-3"
+              placeholder="Enter manager name"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="submissionDeadline" className="text-right">
+              Submission Deadline
+            </Label>
+            <Input
+              id="submissionDeadline"
+              type="date"
+              value={newRFP.submissionDeadline}
+              onChange={(e) => setNewRFP({...newRFP, submissionDeadline: e.target.value})}
+              className="col-span-3"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsAddRFPDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleAddRFP}>Save</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <span className="ml-2">Loading RFPs...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">
+                {error}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -266,41 +477,45 @@ const RFPDetails = () => {
           <p className="text-sm text-gray-500">Procurement and Submission Tracking</p>
         </div>
         <div className="flex items-center space-x-4">
-          <div className="relative flex items-center space-x-2">
-            <Button 
-              variant="outline" 
-              className="h-9 text-gray-700 border-gray-300 whitespace-nowrap"
-              onClick={handleDownloadTemplate}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Sample Template
-            </Button>
-            <div className="relative">
-              <Button 
-                variant="outline" 
-                className="h-9 text-gray-700 border-gray-300"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Import
-              </Button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileImport}
-                accept=".csv,.xlsx,.xls"
-                className="hidden"
-              />
-            </div>
-            <Button 
-              variant="outline" 
-              className="h-9 text-gray-700 border-gray-300"
-              onClick={handleExportData}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-          </div>
+          <Button 
+            variant="default" 
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={() => setIsAddRFPDialogOpen(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add RFP
+          </Button>
+          <Button 
+            variant="outline" 
+            className="h-9 text-gray-700 border-gray-300 whitespace-nowrap"
+            onClick={handleDownloadTemplate}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Sample Template
+          </Button>
+          <Button 
+            variant="outline" 
+            className="h-9 text-gray-700 border-gray-300"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
+          <Button 
+            variant="outline" 
+            className="h-9 text-gray-700 border-gray-300"
+            onClick={handleExportData}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileImport}
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+          />
         </div>
       </div>
 
@@ -315,6 +530,7 @@ const RFPDetails = () => {
           title="RFP Details"
         />
       </div>
+      <AddRFPDialog />
     </div>
   );
 };
