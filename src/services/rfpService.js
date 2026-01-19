@@ -86,6 +86,15 @@ const rfpService = {
       throw error;
     }
   },
+  getRFPsByOpportunityId: async (opportunityId) => {
+  try {
+    const response = await api.get(`/rfps/by-opportunity/${opportunityId}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching RFPs for opportunity ${opportunityId}:`, error);
+    throw error;
+  }
+},
 };
 
 export default rfpService;

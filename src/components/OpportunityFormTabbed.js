@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import opportunityService from '../services/opportunityService';
 import rfpService from '../services/rfpService';
 import clientService from '../services/clientService';
+import sowService from '../services/sowService';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -18,7 +19,7 @@ import MultiFileUpload from './attachments/MultiFileUpload';
 import DateField from './DateField';
 import PropTypes from 'prop-types';
 
-const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = false, showOnlyDetails = false }) => {
+const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = false, showOnlyDetails = false, showOnlySOW = false }) => {
   // Reset form when opportunity changes
   useEffect(() => {
     if (!opportunity) {
@@ -26,14 +27,16 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     }
   }, [opportunity]);
 
-  // Set active tab based on showOnlyRFP or showOnlyDetails
+  // Set active tab based on showOnlyRFP, showOnlySOW, or showOnlyDetails
   useEffect(() => {
-    if (showOnlyRFP) {
+    if (showOnlySOW) {
+      setActiveTab('sow');
+    } else if (showOnlyRFP) {
       setActiveTab('rfp');
     } else if (showOnlyDetails) {
       setActiveTab('details');
     }
-  }, [showOnlyRFP, showOnlyDetails]);
+  }, [showOnlyRFP, showOnlyDetails, showOnlySOW]);
 
   const [activeTab, setActiveTab] = useState('details');
   const [loading, setLoading] = useState(false);
@@ -66,7 +69,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     'Lost'
   ];
   const RFP_STATUSES = ['Draft', 'Submitted', 'Won', 'Lost', 'In Progress'];
-  const SOW_STATUSES = ['Draft', 'In Review', 'Signed', 'Rejected'];
+  const SOW_STATUSES = ['Draft', 'Submitted', 'Won', 'Lost', 'In Progress'];
   
   const TRIAGED_OPTIONS = [
     { value: 'Proceed', label: 'Proceed (Go)' },
@@ -240,6 +243,60 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     e.preventDefault();
     
     try {
+      // Handle SOW creation if in SOW tab
+      if (activeTab === 'sow') {
+        setLoading(true);
+        const authToken = localStorage.getItem('authToken');
+        const authUser = JSON.parse(localStorage.getItem('user'));
+
+        try {
+          // 1. First, get the RFP for this opportunity
+          const opportunityId = opportunity?.id || opportunity?.opportunity?.id;
+          const rfpResponse = await rfpService.getRFPsByOpportunityId(opportunityId);
+          
+          if (!rfpResponse.data || !rfpResponse.data.id) {
+            throw new Error('No RFP found for this opportunity');
+          }
+
+          const rfpId = rfpResponse.data.id;
+
+          // 2. Prepare SOW data with the RFP ID
+          const sowData = {
+            title: formData.sowDetails.sowTitle || `SOW for ${formData.opportunity.opportunity_name}`,
+            status: formData.sowDetails.sowStatus || 'Draft',
+            contractValue: parseFloat(formData.sowDetails.contractValue) || 0,
+            currency: formData.sowDetails.currency || 'USD',
+            targetKickoffDate: formData.sowDetails.targetKickoffDate || null,
+            linkedProposalRef: formData.sowDetails.linkedProposalRef || '',
+            scopeOverview: formData.sowDetails.scopeOverview || '',
+            opportunityId: opportunityId,
+            rfbId: rfpId, // Use the RFP ID from the API response
+            userId: authUser?.id,
+            documents: formData.sowDocuments || []
+          };
+
+          // 3. Create the SOW with the RFP ID
+          const result = await sowService.createSOW(sowData, {
+            headers: {
+              'Authorization': `Bearer ${authToken}`
+            }
+          });
+          
+          toast.success('SOW created successfully!');
+          if (onSuccess) onSuccess(result);
+          if (onClose) onClose();
+          // Redirect to /sows page after successful creation
+          window.location.href = '/sows';
+          
+        } catch (error) {
+          console.error('Error in SOW creation flow:', error);
+          toast.error(error.response?.data?.message || 'Failed to create SOW');
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
       // Handle RFP creation if in RFP tab
       if (activeTab === 'rfp') {
         const rfpData = {
@@ -433,17 +490,17 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           </div>
         </div>
       )}
-      <Tabs value={activeTab} onValueChange={!showOnlyRFP && !showOnlyDetails ? setActiveTab : undefined} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={!showOnlyRFP && !showOnlyDetails && !showOnlySOW ? setActiveTab : undefined} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger 
             value="details" 
-            disabled={showOnlyRFP}
+            disabled={showOnlyRFP || showOnlySOW}
           >
             Details
           </TabsTrigger>
           <TabsTrigger 
             value="rfp"
-            disabled={showOnlyDetails}
+            disabled={showOnlyDetails || showOnlySOW}
           >
             RFP Details
           </TabsTrigger>
@@ -1084,15 +1141,19 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {opportunity ? 'Updating...' : 'Creating...'}
-                </>
-              ) : (
-                <>{activeTab === 'rfp' ? 'Add RFB' : (opportunity ? 'Update Opportunity' : 'Create Opportunity')}</>
-              )}
+              <Button type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {opportunity ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  <>
+                    {activeTab === 'sow' ? 'Add SOW' : 
+                     activeTab === 'rfp' ? 'Add RFB' : 
+                     (opportunity ? 'Update Opportunity' : 'Create Opportunity')}
+                  </>
+                )}
             </Button>
           </div>
         </form>
@@ -1104,6 +1165,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
 OpportunityFormTabbed.propTypes = {
   showOnlyRFP: PropTypes.bool,
   showOnlyDetails: PropTypes.bool,
+  showOnlySOW: PropTypes.bool,
   opportunity: PropTypes.shape({
     opportunityId: PropTypes.string,
     // Add other opportunity properties as needed

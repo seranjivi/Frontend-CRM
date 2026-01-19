@@ -9,11 +9,12 @@ import SOWForm from '../components/SOWForm';
 import { Dialog, DialogContent } from '../components/ui/dialog';
 import { Badge } from '../components/ui/badge';
 import DataTable from '../components/DataTable';
+import sowService from '../services/sowService';
 
 const SOWs = () => {
   const navigate = useNavigate();
   const [sows, setSOWs] = useState([]);
-  const [loading, setLoading] = useState(false); // Set to false to show empty state
+  const [loading, setLoading] = useState(false); 
   const [showForm, setShowForm] = useState(false);
   const [editingSOW, setEditingSOW] = useState(null);
   const [filters, setFilters] = useState({
@@ -21,65 +22,28 @@ const SOWs = () => {
     client: 'All Clients'
   });
 
-  // Mock data for SOWs
-  const mockSOWs = [
-    {
-      id: 'SOW-001',
-      title: 'Website Redesign Project',
-      client: 'Acme Corp',
-      status: 'Active',
-      startDate: '2025-01-15',
-      endDate: '2025-06-15',
-      value: 75000,
-      currency: 'USD',
-      lastUpdated: '2025-01-10T14:30:00Z',
-    },
-    {
-      id: 'SOW-002',
-      title: 'E-commerce Platform Development',
-      client: 'Retail Plus',
-      status: 'Draft',
-      startDate: '2025-02-01',
-      endDate: '2025-08-01',
-      value: 120000,
-      currency: 'USD',
-      lastUpdated: '2025-01-18T09:15:00Z',
-    },
-    {
-      id: 'SOW-003',
-      title: 'Mobile App Development',
-      client: 'Tech Innovators',
-      status: 'Expired',
-      startDate: '2024-06-01',
-      endDate: '2024-12-31',
-      value: 95000,
-      currency: 'USD',
-      lastUpdated: '2024-12-15T16:45:00Z',
-    },
-    {
-      id: 'SOW-004',
-      title: 'Cloud Migration Services',
-      client: 'Global Systems',
-      status: 'In Review',
-      startDate: '2025-01-20',
-      endDate: '2025-07-20',
-      value: 185000,
-      currency: 'USD',
-      lastUpdated: '2025-01-18T11:20:00Z',
-    },
-  ];
-
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredSOWs, setFilteredSOWs] = useState(mockSOWs);
+  const [filteredSOWs, setFilteredSOWs] = useState([]);
 
   useEffect(() => {
     const fetchSOWs = async () => {
       try {
         setLoading(true);
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setSOWs(mockSOWs);
-        setFilteredSOWs(mockSOWs);
+        const response = await sowService.getSOWs();
+        // Map the API response to match the table's expected format
+        const formattedSOWs = response.data.map(sow => ({
+          id: `SOW-${sow.sow_id}`,
+          title: sow.sow_title,
+          client: 'Client Name', // You might want to fetch client name from opportunity
+          status: sow.sow_status,
+          targetKickoffDate: sow.target_kickoff_date,
+          value: parseFloat(sow.contract_value) || 0,
+          currency: sow.contract_currency,
+          // Include original data for reference
+          ...sow
+        }));
+        setSOWs(formattedSOWs);
+        setFilteredSOWs(formattedSOWs);
       } catch (error) {
         console.error('Error fetching SOWs:', error);
         toast.error('Failed to load SOWs');
@@ -92,15 +56,15 @@ const SOWs = () => {
   }, []);
 
   useEffect(() => {
-    const filtered = mockSOWs.filter(sow => {
-      const matchesSearch = sow.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sow.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sow.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const filtered = sows.filter(sow => {
+      const matchesSearch = sow.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         sow.client?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         sow.id?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = filters.status === 'All Status' || sow.status === filters.status;
       return matchesSearch && matchesStatus;
     });
     setFilteredSOWs(filtered);
-  }, [searchTerm, filters.status]);
+  }, [searchTerm, filters.status, sows]);
 
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
@@ -129,12 +93,27 @@ const SOWs = () => {
   };
 
   const formatCurrency = (amount, currency) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
+    // Check if the currency is a valid 3-letter currency code
+    const isValidCurrency = currency && /^[A-Z]{3}$/.test(currency);
+    const currencyToUse = isValidCurrency ? currency : 'USD';
+    
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currencyToUse,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(amount);
+    } catch (error) {
+      console.warn(`Error formatting currency (${currency}):`, error);
+      // Fallback to default USD formatting if there's an error
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(amount);
+    }
   };
 
   const handleCreateSOW = () => {
@@ -151,15 +130,48 @@ const SOWs = () => {
     setShowForm(true);
   };
 
-  const handleFormSubmit = () => {
-    setShowForm(false);
-    // Refresh the SOWs list
-    // fetchSOWs();
+  const handleFormSubmit = async (sowData) => {
+    try {
+      setLoading(true);
+      // TODO: Replace with actual API call
+      // if (editingSOW) {
+      //   await sowService.updateSOW(editingSOW.id, sowData);
+      // } else {
+      //   await sowService.createSOW(sowData);
+      // }
+      setShowForm(false);
+      // Refresh the SOWs list
+      // fetchSOWs();
+      toast.success(`SOW ${editingSOW ? 'updated' : 'created'} successfully`);
+    } catch (error) {
+      console.error('Error saving SOW:', error);
+      toast.error(`Failed to ${editingSOW ? 'update' : 'create'} SOW`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleImportSOW = () => {
     // Handle import SOW
     console.log('Import SOW');
+  };
+
+  const handleDelete = async (sow) => {
+    if (window.confirm(`Are you sure you want to delete ${sow.title}?`)) {
+      try {
+        setLoading(true);
+        // TODO: Replace with actual API call
+        // await sowService.deleteSOW(sow.id);
+        // Refresh the SOWs list
+        // fetchSOWs();
+        toast.success('SOW deleted successfully');
+      } catch (error) {
+        console.error('Error deleting SOW:', error);
+        toast.error('Failed to delete SOW');
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   const columns = [
@@ -182,15 +194,11 @@ const SOWs = () => {
       header: 'Status',
       render: (status) => getStatusBadge(status),
     },
+
     {
-      key: 'startDate',
-      header: 'Start Date',
-      render: (date) => format(parseISO(date), 'MMM d, yyyy'),
-    },
-    {
-      key: 'endDate',
-      header: 'End Date',
-      render: (date) => format(parseISO(date), 'MMM d, yyyy'),
+      key: 'targetKickoffDate',
+      header: 'Target Kickoff Date',
+      render: (date) => date ? format(parseISO(date), 'MMM d, yyyy') : '-',
     },
     {
       key: 'value',
@@ -199,13 +207,6 @@ const SOWs = () => {
       className: 'text-right',
     },
   ];
-
-  const handleDelete = (sow) => {
-    if (window.confirm(`Are you sure you want to delete ${sow.title}?`)) {
-      // Handle delete logic here
-      toast.success('SOW deleted successfully');
-    }
-  };
 
   if (loading) {
     return (
@@ -248,109 +249,65 @@ const SOWs = () => {
             <Button 
               variant="outline" 
               className="h-9 text-gray-700 border-gray-300"
-              onClick={handleImportSOW}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Import
-            </Button>
-            <Button 
-              variant="outline" 
-              className="h-9 text-gray-700 border-gray-300"
               disabled={sows.length === 0}
             >
               <Download className="mr-2 h-4 w-4" />
               Export
             </Button>
           </div>
-          <Button
-            onClick={handleCreateSOW}
-            className="bg-[#0A2A43] hover:bg-[#0A2A43]/90 h-9 text-sm"
-          >
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
-            Create SOW
-          </Button>
+         
         </div>
       </div>
 
-      {filteredSOWs.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <div className="bg-gray-100 p-4 rounded-full">
-              <FileText className="h-10 w-10 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-900">No SOWs found</h3>
-            <p className="text-sm text-gray-500 max-w-md">
-              Get started by creating a new SOW or importing existing ones to manage your statements of work.
-            </p>
-            <div className="flex space-x-3 pt-2">
-              <Button
-                onClick={handleCreateSOW}
-                className="bg-[#0A2A43] hover:bg-[#0A2A43]/90"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create SOW
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleImportSOW}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Import SOWs
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <DataTable
-          data={filteredSOWs}
-          columns={columns}
-          onView={handleViewSOW}
-          onEdit={handleEditSOW}
-          onDelete={handleDelete}
-          onExport={() => {
-            // Handle export logic here
-            toast.success('Exporting SOWs...');
-          }}
-          onImport={handleImportSOW}
-          filterOptions={{
-            search: {
-              placeholder: 'Search SOWs...',
-              value: searchTerm,
-              onChange: (e) => setSearchTerm(e.target.value),
-            },
-            status: {
-              label: 'Status',
-              options: [
-                { value: 'All Status', label: 'All Status' },
-                { value: 'Draft', label: 'Draft' },
-                { value: 'In Review', label: 'In Review' },
-                { value: 'Active', label: 'Active' },
-                { value: 'Expired', label: 'Expired' },
-              ],
-              value: filters.status,
-              onChange: (value) => handleFilterChange('status', value),
-            },
-          }}
-          emptyState={{
-            title: 'No SOWs found',
-            description: 'Get started by creating a new SOW or importing existing ones to manage your statements of work.',
-            actions: [
-              {
-                label: 'Create SOW',
-                onClick: handleCreateSOW,
-                variant: 'default',
-                icon: Plus,
-              },
-              {
-                label: 'Import SOWs',
-                onClick: handleImportSOW,
-                variant: 'outline',
-                icon: Upload,
-              },
+      <DataTable
+        data={filteredSOWs}
+        columns={columns}
+        onView={handleViewSOW}
+        onEdit={handleEditSOW}
+        onDelete={handleDelete}
+        onExport={() => {
+          // Handle export logic here
+          toast.success('Exporting SOWs...');
+        }}
+        onImport={handleImportSOW}
+        filterOptions={{
+          search: {
+            placeholder: 'Search SOWs...',
+            value: searchTerm,
+            onChange: (e) => setSearchTerm(e.target.value),
+          },
+          status: {
+            label: 'Status',
+            options: [
+              { value: 'All Status', label: 'All Status' },
+              { value: 'Draft', label: 'Draft' },
+              { value: 'In Review', label: 'In Review' },
+              { value: 'Active', label: 'Active' },
+              { value: 'Expired', label: 'Expired' },
             ],
-          }}
-        />
-      )}
+            value: filters.status,
+            onChange: (value) => handleFilterChange('status', value),
+          },
+        }}
+        emptyState={{
+          title: 'No SOWs found',
+          description: 'Get started by creating a new SOW or importing existing ones to manage your statements of work.',
+          actions: [
+            {
+              label: 'Create SOW',
+              onClick: handleCreateSOW,
+              variant: 'default',
+              icon: Plus,
+            },
+            {
+              label: 'Import SOWs',
+              onClick: handleImportSOW,
+              variant: 'outline',
+              icon: Upload,
+            },
+          ],
+        }}
+      />
 
       {/* SOW Form Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>

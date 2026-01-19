@@ -14,6 +14,13 @@ import { saveAs } from 'file-saver';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
+// Approval stage constants
+const APPROVAL_STAGES = {
+  LEVEL_1_RFB: 'LEVEL_1_RFB',
+  LEVEL_2_SOW: 'LEVEL_2_SOW',
+  APPROVED: 'APPROVED'
+};
+
 const Opportunities = () => {
   const [opportunities, setOpportunities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +30,7 @@ const Opportunities = () => {
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
   const [isRFPView, setIsRFPView] = useState(false);
   const [showOnlyDetails, setShowOnlyDetails] = useState(false);
+  const [showOnlySOW, setShowOnlySOW] = useState(false);
   const fileInputRef = useRef(null);
 
   // State for filters
@@ -297,6 +305,7 @@ const Opportunities = () => {
       setEditingOpportunity(null);
       setIsRFPView(false); // Reset RFP view state when closing the form
       setShowOnlyDetails(false); // Reset showOnlyDetails state when closing the form
+      setShowOnlySOW(false); // Reset showOnlySOW state when closing the form
     }, 100);
     fetchOpportunities();
   };
@@ -312,9 +321,19 @@ const Opportunities = () => {
 
   const navigate = useNavigate();
 
-  const handleView = (opportunity) => {
-    // Open the form in RFB-only mode
-    setIsRFPView(true);
+  const handleView = (opportunity, currentStage = APPROVAL_STAGES.LEVEL_1_RFB) => {
+    // Reset all view states first
+    setIsRFPView(false);
+    setShowOnlyDetails(false);
+    setShowOnlySOW(false);
+    
+    // Set the appropriate view based on the current stage
+    if (currentStage === APPROVAL_STAGES.LEVEL_2_SOW) {
+      setShowOnlySOW(true);
+    } else {
+      setIsRFPView(true);
+    }
+    
     setEditingOpportunity(opportunity);
     setShowForm(true);
   };
@@ -346,18 +365,30 @@ const Opportunities = () => {
       )
     },
     {
-      key: 'status',
+      key: 'approval_stage',
       header: 'Status',
       headerClassName: 'text-[18px] font-medium',
-      render: (value) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            value === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
-          }`}
-        >
-          {value || 'N/A'}
-        </span>
-      ),
+      render: (value) => {
+        // Define status colors based on approval stage
+        const statusColors = {
+          'Draft': 'bg-blue-100 text-blue-800',
+          'Pending Approval': 'bg-yellow-100 text-yellow-800',
+          'Approved': 'bg-green-100 text-green-800',
+          'Rejected': 'bg-red-100 text-red-800',
+          'In Review': 'bg-purple-100 text-purple-800',
+          'Level 1 Approval - RFB': 'bg-gray-100 text-gray-800'
+        };
+        
+        return (
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-medium ${
+              statusColors[value] || 'bg-gray-100 text-gray-800'
+            }`}
+          >
+            {value || '-'}
+          </span>
+        );
+      },
     },
     {
       key: 'amount',
@@ -413,9 +444,9 @@ const Opportunities = () => {
       header: 'Approval Stage',
       headerClassName: 'text-[18px] font-medium',
       render: (_, row) => {
-        const currentStage = row.approval_stage || 'level1';
+        const currentStage = row.approval_stage || APPROVAL_STAGES.LEVEL_1_RFB;
         
-        if (currentStage === 'approved') {
+        if (currentStage === APPROVAL_STAGES.APPROVED) {
           return (
             <div className="flex items-center space-x-1 text-emerald-600">
               <CheckCircle className="h-4 w-4" />
@@ -424,16 +455,21 @@ const Opportunities = () => {
           );
         }
 
-        const buttonText = currentStage === 'level1' 
+        const isLevel1 = currentStage === APPROVAL_STAGES.LEVEL_1_RFB;
+        const buttonText = isLevel1 
           ? 'Level 1 Approval - RFB' 
           : 'Level 2 Approval - SOW';
         
+        const buttonClass = isLevel1 
+          ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300' 
+          : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200';
+          
         return (
           <Button
-            variant={currentStage === 'level1' ? 'outline' : 'default'}
+            variant="outline"
             size="sm"
-            onClick={() => handleView(row)}
-            className="h-8 text-xs whitespace-nowrap"
+            onClick={() => handleView(row, currentStage)}
+            className={`h-8 text-xs whitespace-nowrap ${buttonClass}`}
           >
             {buttonText}
           </Button>
@@ -564,13 +600,16 @@ const Opportunities = () => {
       <Dialog open={showForm} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isRFPView ? 'RFP Details' : editingOpportunity ? 'Edit Opportunity' : 'Add New Opportunity'}</DialogTitle>
+            <DialogTitle>
+              {showOnlySOW ? 'SOW Details' : isRFPView ? 'RFP Details' : editingOpportunity ? 'Edit Opportunity' : 'Add New Opportunity'}
+            </DialogTitle>
           </DialogHeader>
           <OpportunityFormTabbed 
             opportunity={editingOpportunity} 
             onClose={handleFormClose} 
             showOnlyRFP={isRFPView}
             showOnlyDetails={showOnlyDetails}
+            showOnlySOW={showOnlySOW}
           />
         </DialogContent>
       </Dialog>
