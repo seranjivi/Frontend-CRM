@@ -25,6 +25,7 @@ import SalesActivity from './pages/SalesActivity';
 import Forecast from './pages/Forecast';
 import UserManagement from './pages/UserManagement';
 import RFPDetails from './pages/RFPDetails';
+import SOWForm from './components/SOWForm';
 import OpportunityManagement from './pages/opportunity-management';
 
 function App() {
@@ -166,11 +167,21 @@ function App() {
             }
           />
           <Route
-            path="/sow"
+            path="/sows"
             element={
               <ProtectedRoute>
                 <Layout>
                   <SOWs />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sow/:id"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <SOWForm readOnly />
                 </Layout>
               </ProtectedRoute>
             }

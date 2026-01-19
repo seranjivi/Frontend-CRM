@@ -53,7 +53,7 @@ const Layout = ({ children }) => {
       subItems: [
         { name: 'All Opportunities', href: '/opportunities' },
         { name: 'RFP Details', href: '/rfp-details' },
-        { name: 'SOW Details', href: '/sow-details' },
+        { name: 'SOW Details', href: '/sows', icon: FileText },
         { name: 'Opportunity Management', href: '/opportunity-management', icon: BarChart }
       ]
     },

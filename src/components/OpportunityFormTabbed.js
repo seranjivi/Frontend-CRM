@@ -248,16 +248,18 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
       if (activeTab === 'rfp') {
         const rfpData = {
           opportunityName: formData.opportunity.opportunity_name || 'New RFP',
-          rfpTitle: formData.opportunity.opportunity_name || 'New RFP',
-          rfpStatus: 'Draft',
-          rfpManager: formData.opportunity.assignedTo || '',
-          submissionDeadline: formData.opportunity.closeDate || new Date().toISOString().split('T')[0],
-          opportunityId: opportunity?.id || opportunity?.opportunity?.id
+          title: formData.rfpDetails?.rfpTitle || formData.opportunity.opportunity_name || 'New RFP',
+          rfpStatus: formData.rfpDetails?.rfpStatus || 'Draft',
+          rfpManager: formData.rfpDetails?.bidManager || formData.opportunity.assignedTo || '',
+          submissionDeadline: formData.rfpDetails?.submissionDeadline || formData.opportunity.closeDate || new Date().toISOString().split('T')[0],
+          opportunityId: opportunity?.id || opportunity?.opportunity?.id,
+          rfpDocuments: formData.rfpDocuments || []
         };
 
         const result = await rfpService.createRFP(rfpData);
         toast.success('RFP created successfully!');
-        
+        window.location.href = '/rfp-details';
+
         if (onSuccess && typeof onSuccess === 'function') {
           onSuccess(result);
         }

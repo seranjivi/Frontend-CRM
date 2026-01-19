@@ -405,17 +405,40 @@ const Opportunities = () => {
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
             </svg>
           </Button>
+        </div>
+      )
+    },
+    {
+      key: 'approval_stage',
+      header: 'Approval Stage',
+      headerClassName: 'text-[18px] font-medium',
+      render: (_, row) => {
+        const currentStage = row.approval_stage || 'level1';
+        
+        if (currentStage === 'approved') {
+          return (
+            <div className="flex items-center space-x-1 text-emerald-600">
+              <CheckCircle className="h-4 w-4" />
+              <span>Approved</span>
+            </div>
+          );
+        }
+
+        const buttonText = currentStage === 'level1' 
+          ? 'Level 1 Approval - RFB' 
+          : 'Level 2 Approval - SOW';
+        
+        return (
           <Button
-            variant="outline"
+            variant={currentStage === 'level1' ? 'outline' : 'default'}
             size="sm"
             onClick={() => handleView(row)}
             className="h-8 text-xs whitespace-nowrap"
-            title="Level 2 Approval – RFB"
           >
-            Level 2 Approval – RFB
+            {buttonText}
           </Button>
-        </div>
-      )
+        );
+      }
     }
   ];
 
