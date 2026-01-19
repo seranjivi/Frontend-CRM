@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import api from '../utils/api';
-import { Plus, Download } from 'lucide-react';
-import StandardDataTable from '../components/StandardDataTable';
+import { Plus, Download, X, Search } from 'lucide-react';
+import DataTable from '../components/DataTable';
 import ClientForm from '../components/ClientForm';
 import { Dialog, DialogContent } from '../components/ui/dialog';
 import { toast } from 'sonner';
 import { formatDate } from '../utils/dateUtils';
 import { Button } from '../components/ui/button';
-import { X } from 'lucide-react';
- 
+import clientService from '../services/clientService';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+
 const Clients = () => {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,7 +21,9 @@ const Clients = () => {
     region: '',
     client_status: '',
     client_tier: '',
-    date_range: 'all'
+    date_range: 'all',
+    search: '',
+    client_name: ''
   });
   const fileInputRef = useRef(null);
 
@@ -31,6 +33,9 @@ const Clients = () => {
     client_status: ['Active', 'Inactive', 'Prospect'],
     client_tier: ['A', 'B', 'C', 'D']
   };
+
+  const statusOptions = ['All Status', 'Active', 'Inactive'];
+
 
   // Filter clients based on all active filters
   const filteredClients = clients.filter(client => {
@@ -62,9 +67,26 @@ const Clients = () => {
         dateInRange = true;
     }
 
+    // Client name filter (case-insensitive search)
+    const matchesSearch = !filters.search || 
+      (client.client_name && client.client_name.toLowerCase().includes(filters.search.toLowerCase()));
+
+    // Client name dropdown filter (exact match)
+    const matchesClientName = !filters.client_name || 
+      (client.client_name && client.client_name === filters.client_name);
+
+    // Status filter
+    const matchesStatus = !filters.client_status || 
+      filters.client_status === '' ||
+      filters.client_status === 'All Status' ||
+      (filters.client_status === 'Active' && client.client_status === 'Active') ||
+      (filters.client_status === 'Inactive' && (!client.client_status || client.client_status === 'Inactive'));
+
     return (
+      matchesSearch &&
+      matchesClientName &&
       (filters.region === '' || client.region === filters.region) &&
-      (filters.client_status === '' || client.client_status === filters.client_status) &&
+      matchesStatus &&
       (filters.client_tier === '' || client.client_tier === filters.client_tier) &&
       dateInRange
     );
@@ -85,57 +107,129 @@ const Clients = () => {
       date_range: 'all'
     });
   };
- 
+
   useEffect(() => {
     fetchClients();
   }, []);
- 
+
   const fetchClients = async () => {
     try {
-      const response = await api.get('/clients');
-      setClients(response.data);
+      const data = await clientService.getClients();
+      setClients(data);
     } catch (error) {
       toast.error('Failed to fetch clients');
     } finally {
       setLoading(false);
     }
   };
- 
+
   const handleDelete = async (client) => {
     if (window.confirm(`Are you sure you want to delete ${client.client_name}?`)) {
       try {
-        await api.delete(`/clients/${client.id}`);
+        // Check for different possible ID fields
+        const clientId = client.id || client._id || client.client_id;
+        if (!clientId) {
+          throw new Error('Client ID not found');
+        }
+        await clientService.deleteClient(clientId);
         toast.success('Client deleted successfully');
         fetchClients();
       } catch (error) {
-        toast.error('Failed to delete client');
+        console.error('Error deleting client:', error);
+        toast.error(error.message || 'Failed to delete client');
       }
     }
   };
- 
+
   const handleView = async (client) => {
     setViewingClient(client);
     setLoadingDetails(true);
     try {
-      const response = await api.get(`/clients/${client.id}`);
-      setClientDetails(response.data);
+      const data = await clientService.getClientById(client.id);
+      setClientDetails(data);
     } catch (error) {
       toast.error('Failed to fetch client details');
     } finally {
       setLoadingDetails(false);
     }
   };
- 
+
   const handleCloseView = () => {
     setViewingClient(null);
     setClientDetails(null);
   };
- 
-  const handleEdit = (client) => {
-    setEditingClient(client);
-    setShowForm(true);
+
+  const handleEdit = async (client, e) => {
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+    }
+    
+    try {
+      setLoadingDetails(true);
+      console.log('Client object:', client);
+      const clientId = client.id || client._id || client.client_id;
+      if (!clientId) {
+        throw new Error('Client ID not found');
+      }
+      console.log('Using client ID:', clientId);
+      const response = await clientService.getClientById(clientId);
+      console.log('API Response:', response); // Log the full response
+      
+      if (response) {
+        // The response might be the data directly or response.data
+        const clientData = response.data || response;
+        console.log('Client data:', clientData);
+        
+        // Transform the API response to match the form's expected structure
+        const formData = {
+          id: clientData.id || clientData._id || clientData.client_id,
+          client_name: clientData.client_name || '',
+          contact_email: clientData.contact_email || clientData.email || '',
+          website: clientData.website || '',
+          industry: clientData.industry || '',
+          customer_type: clientData.customer_type || 'Direct Customer',
+          gst_tax_id: clientData.gst_tax_id || clientData.tax_id || '',
+          client_status: clientData.status === 'active' || clientData.client_status === 'Active' ? 'Active' : 'Inactive',
+          notes: clientData.notes || '',
+          account_owner: clientData.account_owner || clientData.user_id || '',
+          // Handle addresses
+          addresses: clientData.addresses && clientData.addresses.length > 0 
+            ? clientData.addresses.map(addr => ({
+                address_line1: addr.address_line1 || '',
+                address_line2: addr.address_line2 || '',
+                city: addr.city || '',
+                region: addr.region_state || '',
+                country: addr.country || '',
+                postal_code: addr.postal_code || '',
+                is_primary: addr.is_primary || false
+              }))
+            : [{ address_line1: '', country: '', region: '', is_primary: true }],
+          // Initialize with empty contact person if none exists
+          contact_persons: clientData.contacts && clientData.contacts.length > 0
+            ? clientData.contacts.map(contact => ({
+                name: contact.name || '',
+                email: contact.email || '',
+                phone: contact.phone || '',
+                designation: contact.designation || '',
+                is_primary: contact.is_primary || false
+              }))
+            : [{ name: '', email: '', phone: '', designation: '', is_primary: false }]
+        };
+        
+        console.log('Form data to be set:', formData);
+        setEditingClient(formData);
+        setShowForm(true);
+      } else {
+        throw new Error('Invalid response format from server');
+      }
+    } catch (error) {
+      console.error('Error in handleEdit:', error);
+      toast.error('Failed to load client details: ' + (error.message || 'Unknown error'));
+    } finally {
+      setLoadingDetails(false);
+    }
   };
- 
+
   const handleFormClose = (shouldRefresh = false) => {
     setShowForm(false);
     setEditingClient(null);
@@ -143,7 +237,7 @@ const Clients = () => {
       fetchClients();
     }
   };
- 
+
   const handleDownloadTemplate = () => {
     const headers = [
       'name',
@@ -156,12 +250,12 @@ const Clients = () => {
       'account_manager',
       'notes'
     ];
-   
+
     const csvContent = [
       headers.join(','),
       headers.map(() => '').join(',')
     ].join('\n');
-   
+
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -170,48 +264,35 @@ const Clients = () => {
     a.click();
     URL.revokeObjectURL(url);
   };
- 
+
   const handleImport = () => {
     fileInputRef.current?.click();
   };
- 
-  const handleExport = () => {
+
+  const handleExport = async () => {
     if (clients.length === 0) {
       toast.warning('No clients to export');
       return;
     }
-   
-    // Get all unique keys from all clients
-    const allKeys = new Set();
-    clients.forEach(client => {
-      Object.keys(client).forEach(key => allKeys.add(key));
-    });
-   
-    const headers = Array.from(allKeys);
-    const csvContent = [
-      headers.join(','),
-      ...clients.map(client =>
-        headers.map(header => {
-          const value = client[header];
-          if (value === null || value === undefined) return '';
-          const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
-          return stringValue.includes(',') ? `"${stringValue}"` : stringValue;
-        }).join(',')
-      )
-    ].join('\n');
-   
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `clients_export_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+
+    try {
+      const csvContent = clientService.exportClients(clients);
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `clients_export_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error('Failed to export clients: ' + error.message);
+    }
   };
- 
+
   const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
  
     const validTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
     if (!validTypes.includes(file.type) && !file.name.endsWith('.csv') && !file.name.endsWith('.xlsx')) {
@@ -282,7 +363,7 @@ const Clients = () => {
  
   const columns = [
     {
-      key: 'client_id',
+      key: 'client_code',
       header: 'Client ID',
       render: (value, row) => (
         <a
@@ -303,42 +384,51 @@ const Clients = () => {
       render: (value) => <span className="font-medium">{value}</span>,
     },
     {
-      key: 'contact_email',
+      key: 'industry',
+      header: 'Industry',
+      render: (value) => <span className="text-sm">{value || '-'}</span>,
+    },
+    {
+      key: 'customer_type',
+      header: 'Customer Type',
+      render: (value) => <span className="text-sm">{value || '-'}</span>,
+    },
+    {
+      key: 'email',
       header: 'Email',
-      render: (value) => value && (
-        <a href={`mailto:${value}`} className="text-blue-600 hover:underline">
+      render: (value) => value ? (
+        <a href={`mailto:${value}`} className="text-blue-600 hover:underline text-sm">
           {value}
         </a>
-      ),
+      ) : '-',
     },
     {
-      key: 'region',
-      header: 'Region'
+      key: 'account_owner',
+      header: 'Account Owner',
+      render: (value) => <span className="text-sm">{value || '-'}</span>,
     },
     {
-      key: 'client_status',
+      key: 'status',
       header: 'Status',
-      render: (value) => (
-        <span
-          className={`px-2 py-1 text-xs font-medium rounded-full ${
-            value === 'Active' ? 'bg-green-100 text-green-700' :
-            value === 'Inactive' ? 'bg-red-100 text-red-700' :
-            value === 'Prospect' ? 'bg-yellow-100 text-yellow-700' :
-            'bg-slate-100 text-slate-700'
-          }`}
-        >
-          {value}
-        </span>
-      ),
-    },
-    {
-      key: 'client_tier',
-      header: 'Tier',
-      render: (value) => (
-        <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
-          {value || 'N/A'}
-        </span>
-      ),
+      render: (_, row) => {
+        // Check both 'status' and 'client_status' fields
+        const statusValue = row.status || row.client_status;
+        if (!statusValue) return <span className="px-2 py-1 text-xs font-medium bg-slate-100 text-slate-700">-</span>;
+        
+        const status = String(statusValue).toLowerCase();
+        const statusText = status.charAt(0).toUpperCase() + status.slice(1);
+        return (
+          <span
+            className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+              status === 'active' ? 'bg-green-100 text-green-800' :
+              status === 'inactive' ? 'bg-red-100 text-red-800' :
+              'bg-slate-100 text-slate-800'
+            }`}
+          >
+            {statusText}
+          </span>
+        );
+      },
     },
     {
       key: 'created_at',
@@ -352,19 +442,65 @@ const Clients = () => {
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
           <div className="pt-1">
-            <h1 className="text-2xl font-bold text-slate-900 font-['Manrope']">Clients</h1>
-            <p className="text-sm text-slate-600 mt-0.5">Manage your client accounts</p>
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-2xl font-bold text-slate-900 font-['Manrope']">Clients</h1>
+              <span className="text-sm text-slate-500">
+                ({clients.length} {clients.length === 1 ? 'record' : 'records'})
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-slate-600 mt-0.5">Manage your client accounts</p>
+            </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap mt-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownloadTemplate}
-              className="h-9 text-xs sm:text-sm whitespace-nowrap"
+            <div className="relative flex items-center">
+              <Search className="absolute left-3 h-4 w-4 text-gray-500" />
+              <input
+                type="search"
+                placeholder="Search..."
+                className="pl-9 w-[180px] h-9 text-sm rounded-md border border-input bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={filters.search || ''}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+              />
+              {filters.search && (
+                <X
+                  className="absolute right-2.5 h-4 w-4 text-muted-foreground cursor-pointer"
+                  onClick={() => handleFilterChange('search', '')}
+                />
+              )}
+            </div>
+            <Select 
+              value={filters.client_name || ''}
+              onValueChange={(value) => handleFilterChange('client_name', value === 'All Clients' ? '' : value)}
             >
-              <Download className="h-3.5 w-3.5 mr-1.5" />
-              Sample Template
-            </Button>
+              <SelectTrigger className="w-[150px] h-9 text-sm">
+                <SelectValue placeholder="Client Name" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All Clients">All Clients</SelectItem>
+                {Array.from(new Set(clients.map(c => c.client_name).filter(Boolean))).map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select 
+              value={filters.status} 
+              onValueChange={(value) => handleFilterChange('status', value)}
+            >
+              <SelectTrigger className="w-[130px] h-9 text-sm">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
             <Button
               variant="outline"
               size="sm"
@@ -404,83 +540,19 @@ const Clients = () => {
           </div>
         </div>
 
-        {/* Column Filters */}
-        <div className="bg-white p-4 rounded-lg border mb-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
-              <select
-                value={filters.region}
-                onChange={(e) => handleFilterChange('region', e.target.value)}
-                className="w-full h-9 px-2 text-sm border rounded-md bg-white"
-              >
-                <option value="">All Regions</option>
-                {filterOptions.region.map(region => (
-                  <option key={region} value={region}>{region}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select
-                value={filters.client_status}
-                onChange={(e) => handleFilterChange('client_status', e.target.value)}
-                className="w-full h-9 px-2 text-sm border rounded-md bg-white"
-              >
-                <option value="">All Statuses</option>
-                {filterOptions.client_status.map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tier</label>
-              <select
-                value={filters.client_tier}
-                onChange={(e) => handleFilterChange('client_tier', e.target.value)}
-                className="w-full h-9 px-2 text-sm border rounded-md bg-white"
-              >
-                <option value="">All Tiers</option>
-                {filterOptions.client_tier.map(tier => (
-                  <option key={tier} value={tier}>Tier {tier}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-              <select
-                value={filters.date_range}
-                onChange={(e) => handleFilterChange('date_range', e.target.value)}
-                className="w-full h-9 px-2 text-sm border rounded-md bg-white"
-              >
-                <option value="all">All Time</option>
-                <option value="this_month">This Month</option>
-                <option value="this_year">This Year</option>
-                <option value="last_month">Last Month</option>
-                <option value="last_year">Last Year</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearFilters}
-                className="h-9 w-full text-xs sm:text-sm whitespace-nowrap"
-              >
-                Clear Filters
-              </Button>
-            </div>
-          </div>
-        </div>
-        <StandardDataTable
+       
+        <DataTable
           data={filteredClients}
           columns={columns}
           onView={handleView}
-          onEdit={handleEdit}
+          onEdit={(client) => handleEdit(client)}
           onDelete={handleDelete}
           testId="clients-table"
           loading={loading}
           hideAddButton={true}
+          editButtonClass="h-8 w-8 p-0 text-blue-600 hover:text-blue-800"
+          viewButtonClass="h-8 w-8 p-0 text-green-600 hover:text-green-800"
+          deleteButtonClass="h-8 w-8 p-0 text-red-600 hover:text-red-800"
         />
       </div>
  
@@ -526,29 +598,29 @@ const Clients = () => {
                       <div className="space-y-4">
                         <div>
                           <label className="text-sm font-medium text-gray-500">Client ID</label>
-                          <div className="mt-1 text-sm">{clientDetails.client_id || 'N/A'}</div>
+                          <div className="mt-1 text-sm">{clientDetails.client_id || '-'}</div>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">Client Name</label>
-                          <div className="mt-1 text-sm font-medium">{clientDetails.client_name || 'N/A'}</div>
+                          <div className="mt-1 text-sm font-medium">{clientDetails.client_name || '-'}</div>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">Email</label>
                           <div className="mt-1 text-sm">
-                            {clientDetails.contact_email ? (
+                            {clientDetails.email ? (
                               <a
-                                href={`mailto:${clientDetails.contact_email}`}
+                                href={`mailto:${clientDetails.email}`}
                                 className="text-blue-600 hover:underline"
                               >
-                                {clientDetails.contact_email}
+                                {clientDetails.email}
                               </a>
-                            ) : 'N/A'}
+                            ) : '-'}
                           </div>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">Phone</label>
                           <div className="mt-1 text-sm">
-                            {clientDetails.phone || 'N/A'}
+                            {clientDetails.phone || '-'}
                           </div>
                         </div>
                       </div>
@@ -561,21 +633,21 @@ const Clients = () => {
                               clientDetails.client_status === 'Inactive' ? 'bg-red-100 text-red-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                              {clientDetails.client_status || 'N/A'}
+                              {clientDetails.client_status || '-'}
                             </span>
                           </div>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">Tier</label>
-                          <div className="mt-1 text-sm">{clientDetails.client_tier || 'N/A'}</div>
+                          <div className="mt-1 text-sm">{clientDetails.client_tier || '-'}</div>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">Industry</label>
-                          <div className="mt-1 text-sm">{clientDetails.industry || 'N/A'}</div>
+                          <div className="mt-1 text-sm">{clientDetails.industry || '-'}</div>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">Created</label>
-                          <div className="mt-1 text-sm">{formatDate(clientDetails.created_at) || 'N/A'}</div>
+                          <div className="mt-1 text-sm">{formatDate(clientDetails.created_at) || '-'}</div>
                         </div>
                       </div>
                     </div>

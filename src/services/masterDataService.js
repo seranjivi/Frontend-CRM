@@ -52,8 +52,28 @@ class MasterDataService {
     }
 
     try {
-      const response = await api.get('/master/countries');
-      const countries = response.data || [];
+      const response = await api.get('/countries');
+      
+      // Handle different possible response structures
+      let countries = [];
+      
+      if (Array.isArray(response.data)) {
+        countries = response.data;
+      } else if (response.data && Array.isArray(response.data.data)) {
+        // Handle case where data is in response.data.data
+        countries = response.data.data;
+      } else if (response.data) {
+        // Handle case where response.data is an object but not in expected format
+        countries = Object.values(response.data);
+      }
+      
+      // Ensure we have valid country objects with required fields
+      countries = countries.map(country => ({
+        id: country.id || country.country_id || '',
+        name: country.name || country.country_name || '',
+        code: country.code || country.country_code || '',
+        region: country.region || country.region_name || ''
+      }));
       
       if (countries.length === 0) {
         const fallbackCountries = this.getFallbackCountries();
@@ -172,6 +192,49 @@ class MasterDataService {
   }
 
   // Clear cache (useful for testing or when master data is updated)
+  // Get regions by country ID
+ async getRegionsByCountryId(countryId) {
+  if (!countryId) {
+    console.log('No country ID provided to getRegionsByCountryId');
+    return [];
+  }
+  
+  try {
+    console.log(`Fetching regions for country ID: ${countryId}`);
+    const response = await api.get(`/regions/country/${countryId}`);
+    console.log('Regions API Response:', response);
+    
+    if (!response.data) {
+      console.warn('No data in regions API response');
+      return [];
+    }
+    
+    // Handle different response structures
+    let regions = [];
+    if (Array.isArray(response.data)) {
+      regions = response.data;
+    } else if (response.data.data && Array.isArray(response.data.data)) {
+      regions = response.data.data;
+    }
+    
+    console.log(`Found ${regions.length} regions for country ${countryId}`);
+    
+    // Map the response to the expected format
+    return regions.map(region => ({
+      id: region.id || region.region_id || '',
+      name: region.name || region.region_name || region.region || '',
+      country_id: region.country_id || countryId
+    }));
+    
+  } catch (error) {
+    console.error(`Error fetching regions for country ${countryId}:`, error);
+    if (error.response) {
+      console.error('Error response data:', error.response.data);
+    }
+    return [];
+  }
+}
+
   clearCache() {
     this.regionsCache = null;
     this.countriesCache = null;

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import api from '../utils/api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -10,16 +9,18 @@ import DateField from './DateField';
 import RegionDropdown from './RegionDropdown';
 import CountryDropdown from './CountryDropdown';
 import { Plus, Trash2, Building2, X } from 'lucide-react';
- 
+import { getUsers } from '../services/userService';
+import clientService from '../services/clientService';
+
 const ClientForm = ({ client, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     client_name: '',
     contact_email: '',
     website: '',
     industry: '',
-    customer_type: 'Direct Customer',
+    customer_type: '',
     gst_tax_id: '',
-    addresses: [{ address: '', country: '', region: '' }],
+    addresses: [{ address_line1: '', country: '', region: '', is_primary: true }],
     account_owner: '',
     client_status: 'Active',
     notes: '',
@@ -27,10 +28,36 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
- 
+  const [selectedCountryIds, setSelectedCountryIds] = useState({});
+  const [users, setUsers] = useState([]);
+
+  // Fetch users for account owner dropdown
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await getUsers();
+        // Extract users array from response.data
+        const usersData = Array.isArray(response?.data) ? response.data : [];
+        setUsers(usersData);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        toast.error('Failed to load users');
+        setUsers([]); // Ensure users is always an array even on error
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  // Debug effect to log formData.industry and client prop
+  useEffect(() => {
+    console.log('formData.industry:', formData.industry);
+    console.log('client prop:', client);
+  }, [formData.industry, client]);
+
   useEffect(() => {
     if (client) {
-      setFormData({
+      const initialData = {
         client_name: client.client_name || '',
         contact_email: client.contact_email || '',
         website: client.website || '',
@@ -39,14 +66,39 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
         gst_tax_id: client.gst_tax_id || '',
         addresses: client.addresses && client.addresses.length > 0
           ? client.addresses
-          : [{ address: '', country: '', region: '' }],
+          : [{ address: '', country: '', region: '', is_primary: true }],
         account_owner: client.account_owner || '',
         client_status: client.client_status || 'Active',
         notes: client.notes || '',
         contact_persons: client.contact_persons && client.contact_persons.length > 0
           ? client.contact_persons
           : [{ name: '', email: '', phone: '', designation: '', is_primary: false }]
-      });
+      };
+      console.log('Initial data:', initialData);
+
+      // Set the selected country IDs from the addresses
+      const countryIds = {};
+      if (client.addresses) {
+        client.addresses.forEach((addr, idx) => {
+          if (addr.country_id) {
+            countryIds[idx] = addr.country_id;
+          } else if (addr.country) {
+            // If we have a country name but no ID, we'll need to look it up
+            // For now, we'll just set it to null and it will be updated when the country is selected
+            countryIds[idx] = null;
+          }
+        });
+      }
+      
+      setSelectedCountryIds(countryIds);
+      setFormData(initialData);
+    } else {
+      // For new client, initialize with one empty address
+      setFormData(prev => ({
+        ...prev,
+        addresses: [{ address: '', country: '', region: '', is_primary: true }]
+      }));
+      setSelectedCountryIds({ 0: '' });
     }
   }, [client]);
  
@@ -85,24 +137,40 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
     setFormData(prev => ({ ...prev, contact_persons: updatedContacts }));
   };
  
+  const handleCountryChange = (index, countryName, countryId) => {
+    // Update the selected country ID
+    setSelectedCountryIds(prev => ({
+      ...prev,
+      [index]: countryId
+    }));
+    
+    // Update the form data with the country name
+    handleAddressChange(index, 'country', countryName);
+    // Clear region when country changes
+    handleAddressChange(index, 'region', '');
+  };
+
   const handleAddressChange = (index, field, value) => {
     const updatedAddresses = [...formData.addresses];
     updatedAddresses[index][field] = value;
     setFormData(prev => ({ ...prev, addresses: updatedAddresses }));
   };
- 
+
   const setPrimaryAddress = (index) => {
-    const updatedAddresses = formData.addresses.map((addr, i) => ({
-      ...addr,
-      is_primary: i === index
-    }));
-    setFormData(prev => ({ ...prev, addresses: updatedAddresses }));
+    if (!formData.addresses[index].is_primary) {
+      const updatedAddresses = formData.addresses.map((addr, i) => ({
+        ...addr,
+        is_primary: i === index
+      }));
+      setFormData(prev => ({ ...prev, addresses: updatedAddresses }));
+    }
   };
- 
+
   const addAddress = () => {
+    const newIndex = formData.addresses.length;
     setFormData(prev => {
       const newAddress = {
-        address: '',
+        address_line1: '',
         country: '',
         region: '',
         is_primary: prev.addresses.length === 0 // First address is primary by default
@@ -112,12 +180,34 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
         addresses: [...prev.addresses, newAddress]
       };
     });
+    
+    // Initialize the selected country ID for the new address
+    setSelectedCountryIds(prev => ({
+      ...prev,
+      [newIndex]: ''
+    }));
   };
- 
+
   const removeAddress = (index) => {
     if (formData.addresses.length > 1) {
-      const updatedAddresses = formData.addresses.filter((_, i) => i !== index);
-      setFormData(prev => ({ ...prev, addresses: updatedAddresses }));
+      const updatedAddresses = [...formData.addresses];
+      const wasPrimary = updatedAddresses[index].is_primary;
+      updatedAddresses.splice(index, 1);
+      
+      // If we removed the primary address, make the first address primary
+      if (wasPrimary && updatedAddresses.length > 0) {
+        updatedAddresses[0].is_primary = true;
+      }
+      
+      setFormData(prev => ({
+        ...prev,
+        addresses: updatedAddresses
+      }));
+      
+      // Remove the selected country ID for this index
+      const newSelectedCountryIds = {...selectedCountryIds};
+      delete newSelectedCountryIds[index];
+      setSelectedCountryIds(newSelectedCountryIds);
     }
   };
  
@@ -159,8 +249,8 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
         hasAtLeastOneAddress = true;
       }
      
-      if (!address.address) {
-        newErrors[`address_${index}`] = 'Address is required';
+      if (!address.address_line1) {
+        newErrors[`address_line1_${index}`] = 'Address Line 1 is required';
       }
       if (!address.region) {
         newErrors[`region_${index}`] = 'Region is required';
@@ -188,39 +278,58 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
  
   const handleSubmit = async (e) => {
     e.preventDefault();
-   
+    
     if (!validateForm()) {
       toast.error('Please fill in all required fields');
       return;
     }
-   
+    
     setLoading(true);
- 
+
     try {
-      const submitData = {
-        ...formData,
-        // For backward compatibility, use first address as primary
-        address: formData.addresses[0]?.address || '',
-        country: formData.addresses[0]?.country || '',
-        region: formData.addresses[0]?.region || '',
-        // Keep primary email as contact_email for backward compatibility
-        contact_persons: formData.contact_persons.filter(contact =>
-          contact.name || contact.email || contact.phone
-        ),
-        // Include all addresses
-        addresses: formData.addresses.filter(addr =>
-          addr.address || addr.country || addr.region
-        )
+      // Transform form data to match the required payload structure
+      const payload = {
+        client_name: formData.client_name,
+        email: formData.contact_email, // Map contact_email to email
+        website: formData.website,
+        industry: formData.industry,
+        customer_type: formData.customer_type,
+        tax_id: formData.gst_tax_id, // Map gst_tax_id to tax_id
+        status: formData.client_status?.toLowerCase() === 'active' ? 'active' : 'inactive',
+        notes: formData.notes,
+        user_id: formData.account_owner,
+        // Process contacts - filter out empty ones and map to required structure
+        contacts: formData.contact_persons
+          .filter(contact => contact.name || contact.email || contact.phone)
+          .map(contact => ({
+            name: contact.name,
+            email: contact.email,
+            phone: contact.phone,
+            designation: contact.designation,
+            is_primary: contact.is_primary || false
+          })),
+        // Process addresses - filter out empty ones and map to required structure
+        addresses: formData.addresses
+          .filter(addr => addr.address_line1 || addr.country || addr.region)
+          .map(addr => ({
+            address_line1: addr.address_line1,
+            address_line2: addr.address_line2 || '',
+            city: addr.city || '',
+            region_state: addr.region || '', // Map region to region_state
+            country: addr.country,
+            postal_code: addr.postal_code || '',
+            is_primary: addr.is_primary || false
+          }))
       };
- 
+
       if (client) {
-        await api.put(`/clients/${client.id}`, submitData);
+        await clientService.updateClient(client.id, payload);
         toast.success('Client updated successfully');
       } else {
-        await api.post('/clients', submitData);
+        await clientService.createClient(payload);
         toast.success('Client created successfully');
       }
-     
+      
       // Call onSuccess if provided, otherwise just close the form
       if (onSuccess) {
         onSuccess();
@@ -302,11 +411,14 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
             <div className="space-y-2">
               <Label htmlFor="industry">Industry</Label>
               <Select
-                value={formData.industry}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, industry: value }))}
+                key={`industry-${formData.industry || 'empty'}`}
+                defaultValue={formData.industry || ''}
+                onValueChange={(value) => {
+                  setFormData(prev => ({ ...prev, industry: value }));
+                }}
                 data-testid="client-industry-select"
               >
-                <SelectTrigger>
+                <SelectTrigger className={!formData.industry ? 'text-muted-foreground' : ''}>
                   <SelectValue placeholder="Select industry..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -333,7 +445,8 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
             <div className="space-y-2">
               <Label htmlFor="customer_type">Customer Type <span className="text-red-500">*</span></Label>
               <Select
-                value={formData.customer_type}
+                key={`customer-type-${formData.customer_type || 'empty'}`}
+                defaultValue={formData.customer_type || ''}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, customer_type: value }))}
                 data-testid="client-customer-type-select"
               >
@@ -467,16 +580,16 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
             {formData.addresses.map((address, index) => (
               <div
                 key={index}
-                className={`grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg ${address.is_primary ? 'border-blue-500 bg-blue-50' : ''}`}
+                className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 "
               >
                 <div className="md:col-span-2">
-                  <Label htmlFor={`address_${index}`}>
-                    Address {address.is_primary && <span className="text-blue-600 ml-2">(Primary)</span>}
+                  <Label htmlFor={`address_line1_${index}`}>
+                    Address Line 1 {address.is_primary && <span className="text-blue-600 ml-2">(Primary)</span>}
                   </Label>
                   <Textarea
-                    id={`address_${index}`}
-                    value={address.address}
-                    onChange={(e) => handleAddressChange(index, 'address', e.target.value)}
+                    id={`address_line1_${index}`}
+                    value={address.address_line1}
+                    onChange={(e) => handleAddressChange(index, 'address_line1', e.target.value)}
                     rows={3}
                     placeholder="123 Main St, Suite 100, City, State 12345"
                     data-testid={`address-${index}`}
@@ -484,45 +597,33 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor={`region_${index}`}>Region / State</Label>
-                  <Select
-                    value={address.region}
-                    onValueChange={(value) => handleAddressChange(index, 'region', value)}
-                    data-testid={`region-${index}`}
-                  >
-                    <SelectTrigger className={errors[`region_${index}`] ? 'border-red-500' : ''}>
-                      <SelectValue placeholder="Select region..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="North America">North America</SelectItem>
-                      <SelectItem value="South America">South America</SelectItem>
-                      <SelectItem value="Europe">Europe</SelectItem>
-                      <SelectItem value="Asia">Asia</SelectItem>
-                      <SelectItem value="Africa">Africa</SelectItem>
-                      <SelectItem value="Oceania">Oceania</SelectItem>
-                      <SelectItem value="Middle East">Middle East</SelectItem>
-                      <SelectItem value="Central America">Central America</SelectItem>
-                      <SelectItem value="Caribbean">Caribbean</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors[`region_${index}`] && (
-                    <p className="text-red-500 text-sm mt-1">{errors[`region_${index}`]}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor={`country_${index}`}>Country <span className="text-red-500">*</span></Label>
                   <CountryDropdown
                     value={address.country}
-                    onChange={(value) => handleAddressChange(index, 'country', value)}
-                    region={address.region}
-                    placeholder="Select country..."
-                    required={true}
-                    showRequiredIndicator={true}
+                    onChange={(country, countryId) => handleCountryChange(index, country, countryId)}
+                    required
+                    showRequiredIndicator={false}
                     className={errors[`country_${index}`] ? 'border-red-500' : ''}
                     data-testid={`country-${index}`}
                   />
                   {errors[`country_${index}`] && (
                     <p className="text-red-500 text-sm mt-1">{errors[`country_${index}`]}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`region_${index}`}>Region <span className="text-red-500">*</span></Label>
+                  <RegionDropdown
+                    value={address.region}
+                    onChange={(value) => handleAddressChange(index, 'region', value)}
+                    countryId={selectedCountryIds[index]}
+                    placeholder="Select region..."
+                    required={true}
+                    showRequiredIndicator={true}
+                    className={errors[`region_${index}`] ? 'border-red-500' : ''}
+                    data-testid={`region-${index}`}
+                  />
+                  {errors[`region_${index}`] && (
+                    <p className="text-red-500 text-sm mt-1">{errors[`region_${index}`]}</p>
                   )}
                 </div>
                 <div className="flex items-end space-x-2">
@@ -563,20 +664,30 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="account_owner">Account Owner <span className="text-red-500">*</span></Label>
-              <Select
-                value={formData.account_owner}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, account_owner: value }))}
-                data-testid="client-account-owner-select"
-              >
-                <SelectTrigger className={errors.account_owner ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select account owner..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Thilakraj">Thilakraj</SelectItem>
-                  <SelectItem value="Admin">Admin</SelectItem>
-                  <SelectItem value="Manager">Manager</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Select
+  value={formData.account_owner ? String(formData.account_owner) : ''}
+  onValueChange={(value) => {
+    setFormData(prev => ({ ...prev, account_owner: value }));
+    if (errors.account_owner) {
+      setErrors(prev => ({ ...prev, account_owner: '' }));
+    }
+  }}
+>
+  <SelectTrigger className={errors.account_owner ? 'border-red-500' : ''}>
+    <SelectValue placeholder="Select account owner..." />
+  </SelectTrigger>
+
+  <SelectContent>
+    {users.map((user) => (
+      <SelectItem key={user.id} value={String(user.id)}>
+        {user.full_name || user.email}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+
+              </div>
               {errors.account_owner && (
                 <p className="text-red-500 text-sm mt-1">{errors.account_owner}</p>
               )}
