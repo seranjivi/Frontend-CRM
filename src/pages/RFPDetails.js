@@ -478,22 +478,6 @@ const RFPDetails = () => {
         </div>
         <div className="flex items-center space-x-4">
           <Button 
-            variant="default" 
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-            onClick={() => setIsAddRFPDialogOpen(true)}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add RFP
-          </Button>
-          <Button 
-            variant="outline" 
-            className="h-9 text-gray-700 border-gray-300 whitespace-nowrap"
-            onClick={handleDownloadTemplate}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Sample Template
-          </Button>
-          <Button 
             variant="outline" 
             className="h-9 text-gray-700 border-gray-300"
             onClick={() => fileInputRef.current?.click()}

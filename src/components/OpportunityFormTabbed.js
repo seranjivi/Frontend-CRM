@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import opportunityService from '../services/opportunityService';
 import rfpService from '../services/rfpService';
+import clientService from '../services/clientService';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -37,14 +38,10 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   const [activeTab, setActiveTab] = useState('details');
   const [loading, setLoading] = useState(false);
   const [formErrors, setFormErrors] = useState({});
-  const [searchTerm, setSearchTerm] = useState('');
-  const [clients, setClients] = useState([]);
-  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
-  const [isLoadingClients, setIsLoadingClients] = useState(false);
-  const [clientSearchError, setClientSearchError] = useState('');
-  const [hasFetchedClients, setHasFetchedClients] = useState(false);
   const [nextStepInput, setNextStepInput] = useState('');
   const [isSubmittingNextStep, setIsSubmittingNextStep] = useState(false);
+  const [clients, setClients] = useState([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
 
   const LEAD_SOURCES = [
     'Advertisement', 'Cold Call', 'Employee Referral', 'External Referral',
@@ -110,7 +107,6 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   const defaultFormData = {
     opportunity: {
       opportunity_name: '',
-      clientId: '',
       client_name: '',
       closeDate: '',
       amount: 0,
@@ -224,8 +220,8 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     if (!formData.opportunity.opportunity_name?.trim()) {
       errors.opportunity_name = 'Opportunity name is required';
     }
-    if (!formData.opportunity.clientId) {
-      errors.clientId = 'Client selection is required';
+    if (!formData.opportunity.client_name) {
+      errors.client_name = 'Client selection is required';
     }
     if (!formData.opportunity.closeDate) {
       errors.closeDate = 'Close date is required';
@@ -288,7 +284,6 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         // Required fields
         opportunity_name: formData.opportunity.opportunity_name || 'New Opportunity',
         client_name: formData.opportunity.client_name || 'Unknown Client',
-        client_id: formData.opportunity.clientId,
         close_date: closeDate,
         amount: parseFloat(formData.opportunity.amount) || 0,
         amount_currency: formData.opportunity.currency || 'USD',
@@ -358,90 +353,27 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     }
   };
 
-  const handleClientSelect = (client) => {
-    updateOpportunityData('clientId', client._id || client.id);
-    updateOpportunityData('client_name', client.client_name || client.name);
-    updateOpportunityData('clientEmail', client.email || '');
-    updateOpportunityData('clientPhone', client.phone || '');
-    updateOpportunityData('clientAddress', client.address || '');
-    updateOpportunityData('clientIndustry', client.industry || '');
-    setSearchTerm(client.client_name);
-
+  const handleClientSelect = (e) => {
+    updateOpportunityData('client_name', e.target.value);
   };
 
+  // Fetch clients when component mounts
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      const clientSearch = document.getElementById('clientSearch');
-      if (clientSearch && !clientSearch.contains(event.target)) {
-        setIsClientDropdownOpen(false);
+    const fetchClients = async () => {
+      setIsLoadingClients(true);
+      try {
+        const clientsData = await clientService.getClients();
+        setClients(clientsData);
+      } catch (error) {
+        console.error('Error fetching clients:', error);
+        toast.error('Failed to load clients');
+      } finally {
+        setIsLoadingClients(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    fetchClients();
   }, []);
-
-  const fetchClients = async (search = '') => {
-    setIsLoadingClients(true);
-    setClientSearchError('');
-    setHasFetchedClients(true);
-
-    try {
-      const response = await opportunityService.getClients();
-
-      // Ensure we have valid client data
-      const clientsData = Array.isArray(response.data) 
-        ? response.data 
-        : (response.data && Array.isArray(response.data.clients)) 
-          ? response.data.clients 
-          : [];
-          
-      setClients(clientsData);
-    } catch (error) {
-      console.error('Error fetching clients:', error);
-      setClientSearchError('Failed to load clients. Please try again.');
-      setClients([]);
-    } finally {
-      setIsLoadingClients(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isClientDropdownOpen && searchTerm.length >= 2) {
-      const debounceTimer = setTimeout(() => {
-        fetchClients(searchTerm);
-      }, 500);
-      return () => clearTimeout(debounceTimer);
-    }
-  }, [searchTerm, isClientDropdownOpen]);
-
-  useEffect(() => {
-    const loadOpportunityData = async () => {
-      if (opportunity?.opportunityId) {
-        try {
-          setLoading(true);
-          const data = await opportunityService.getOpportunityById(opportunity.opportunityId);
-
-          setFormData({
-            opportunity: data.opportunity || formData.opportunity,
-            rfpDetails: data.rfpDetails || formData.rfpDetails,
-            sowDetails: data.sowDetails || formData.sowDetails,
-            rfpDocuments: data.rfpDocuments || [],
-            sowDocuments: data.sowDocuments || []
-          });
-        } catch (error) {
-          console.error('Error loading opportunity:', error);
-          toast.error('Failed to load opportunity data');
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadOpportunityData();
-  }, [opportunity]);
 
   const addNextStep = async () => {
     if (!nextStepInput.trim()) return;
@@ -547,107 +479,27 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                     </div>
                   </div>
 
-                  <div className="relative" id="clientSearch">
-                    <Label htmlFor="clientSearch">Client *</Label>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsClientDropdownOpen(!isClientDropdownOpen);
-                          if (!hasFetchedClients) {
-                            fetchClients();
-                          }
-                        }}
-                        className="flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <span className="truncate">
-                          {formData.opportunity.client_name || 'Select a client...'}
-                        </span>
-                        <ChevronDown className="h-4 w-4 opacity-50" />
-                      </button>
-                      
-                      {isClientDropdownOpen && (
-                        <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
-                          <div className="p-2 border-b">
-                            <div className="relative">
-                              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                type="search"
-                                placeholder="Search clients..."
-                                className="w-full bg-background pl-8"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                autoFocus
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="max-h-[250px] overflow-auto">
-                            {isLoadingClients ? (
-                              <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Loading clients...
-                              </div>
-                            ) : clientSearchError ? (
-                              <div className="p-4 text-center text-sm text-destructive">
-                                {clientSearchError}
-                              </div>
-                            ) : clients.length === 0 ? (
-                              <div className="p-4 text-center text-sm text-muted-foreground">
-                                {searchTerm ? 'No clients found' : 'No clients available'}
-                              </div>
-                            ) : (
-                            clients.map((client) => (
-                              <div
-                                key={client.id}
-                                className="cursor-pointer select-none rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
-                                onClick={() => {
-                                  handleClientSelect({
-                                    _id: client.id,
-                                    client_name: client.client_name,
-                                    email: client.contact_email,
-                                    phone: '', // Add phone if available
-                                    companyName: client.client_name
-                                  });
-                                  setIsClientDropdownOpen(false);
-                                }}
-                              >
-                                <div className="font-medium">
-                                  {client.client_name}
-                                </div>
-                              </div>
-                            ))
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {formErrors.clientId && (
-                      <p className="mt-1 text-sm text-red-600">{formErrors.clientId}</p>
-                    )}
-                    {formData.opportunity.clientId && (
-                      <div className="mt-2 p-3 bg-gray-50 rounded-md">
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="text-gray-500">Name:</span> {formData.opportunity.client_name || 'N/A'}
-                          </div>
-                          <div>
-                            <span className="text-gray-500">Email:</span> {formData.opportunity.clientEmail || 'N/A'}
-                          </div>
-                          {formData.opportunity.clientPhone && (
-                            <div>
-                              <span className="text-gray-500">Phone:</span> {formData.opportunity.clientPhone}
-                            </div>
-                          )}
-                          {formData.opportunity.clientIndustry && (
-                            <div>
-                              <span className="text-gray-500">Industry:</span> {formData.opportunity.clientIndustry}
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="client">Client *</Label>
+                    <select
+                      id="client"
+                      value={formData.opportunity.client_name || ''}
+                      onChange={handleClientSelect}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={isLoadingClients}
+                      required
+                    >
+                      <option value="">
+                        {isLoadingClients ? 'Loading clients...' : 'Select a client...'}
+                      </option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.client_name}>
+                          {client.client_name}
+                        </option>
+                      ))}
+                    </select>
+                    {formErrors.client_name && (
+                      <p className="mt-1 text-sm text-red-600">{formErrors.client_name}</p>
                     )}
                   </div>
 
