@@ -46,7 +46,7 @@ const Layout = ({ children }) => {
     { name: 'Client', href: '/clients', icon: Building2, permission: 'clients' },
     { name: 'Client Overview', href: '/client-overview', icon: Users, permission: 'client_overview' },
     { name: 'Sales Activity', href: '/sales-activity', icon: Activity, permission: 'sales_activity' },
-    { name: 'Leads', href: '/leads', icon: Target, permission: 'leads' },
+    // { name: 'Leads', href: '/leads', icon: Target, permission: 'leads' },
     { 
       name: 'Opportunities', 
       href: '/opportunities', 

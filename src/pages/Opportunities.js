@@ -559,17 +559,37 @@ const Opportunities = () => {
               Import
             </Button>
             <ImportCSVModal
-              isOpen={showImportModal}
-              onClose={() => setShowImportModal(false)}
-              onFileSelect={(file) => {
-                setSelectedFile(file);
-                // You can add your import logic here using the file
-                console.log('Selected file:', file.name);
-                // Call your existing handleFileImport if needed
-                // handleFileImport({ target: { files: [file] } });
-              }}
-              title="Import Opportunities"
-            />
+  isOpen={showImportModal}
+  onClose={() => setShowImportModal(false)}
+  onFileSelect={async (file) => {
+    try {
+      const response = await opportunityService.importOpportunities(file);
+      console.log('Import response:', response);
+      toast.success('Opportunities imported successfully!');
+      fetchOpportunities(); // Refresh the list
+      setShowImportModal(false);
+      return response;
+    } catch (error) {
+      console.error('Import error:', error);
+      const errorMessage = error.response?.data?.message || 
+                         error.message || 
+                         'Failed to import opportunities. Please try again.';
+      toast.error(`Import failed: ${errorMessage}`);
+      throw error;
+    }
+  }}
+  onDownloadTemplate={async () => {
+    try {
+      const templateBlob = await opportunityService.downloadTemplate();
+      return templateBlob;
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      toast.error('Failed to download template. Please try again.');
+      throw error;
+    }
+  }}
+  title="Import Opportunities"
+/>
             <Button 
               variant="outline" 
               className="h-9 text-gray-700 border-gray-300"

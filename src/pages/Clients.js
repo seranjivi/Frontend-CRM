@@ -508,7 +508,7 @@ const Clients = () => {
               </SelectContent>
             </Select>
             
-            <Button
+            {/* <Button
               variant="outline"
               size="sm"
               onClick={() => setShowImportModal(true)}
@@ -516,7 +516,7 @@ const Clients = () => {
             >
               <Download className="h-3.5 w-3.5 mr-1.5 rotate-180" />
               Import
-            </Button>
+            </Button> */}
             <input
               ref={fileInputRef}
               type="file"

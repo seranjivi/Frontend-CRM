@@ -82,7 +82,36 @@ const clientService = {
     ].join('\n');
 
     return csvContent;
+  },
+  downloadClientTemplate: async () => {
+  try {
+    const response = await api.get('/client/template', {
+      responseType: 'blob',
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error downloading client template:', error);
+    throw error;
   }
+},
+// Import clients from file
+importClients: async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await api.post('/client/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error importing clients:', error);
+    throw error;
+  }
+}
 };
 
 export default clientService;

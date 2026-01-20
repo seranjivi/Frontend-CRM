@@ -1,8 +1,10 @@
 import React, { useCallback, useState, useRef } from 'react';
 import { X, Upload, FileText } from 'lucide-react';
 import { Button } from './ui/button';
+import { saveAs } from 'file-saver';
+import { toast } from 'sonner';
 
-export default function ImportCSVModal({ isOpen, onClose, onFileSelect, title = 'Import Data' }) {
+export default function ImportCSVModal({ isOpen, onClose, onFileSelect, onDownloadTemplate,title = 'Import Data' }) {
   const [file, setFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
@@ -34,42 +36,49 @@ export default function ImportCSVModal({ isOpen, onClose, onFileSelect, title = 
   }, [onFileSelect]);
 
   const handleFileInput = (e) => {
-    const selectedFile = e.target.files[0];
+    const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      if (selectedFile.type === 'text/csv' || selectedFile.name.endsWith('.csv')) {
+      const fileExtension = selectedFile.name.split('.').pop().toLowerCase();
+      const isValidFileType = ['csv', 'xlsx'].includes(fileExtension);
+      
+      if (isValidFileType) {
         setFile(selectedFile);
         onFileSelect(selectedFile);
       } else {
-        alert('Please upload a valid CSV file');
+        toast.error('Please upload a valid CSV or Excel file (.csv, .xlsx)');
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     }
   };
 
-  const handleImport = () => {
-    // Handle import logic here
-    if (file) {
-      console.log('Importing file:', file.name);
-      // Process the file
+  const handleImport = async () => {
+    if (!file) return;
+    
+    try {
+      const response = await onFileSelect(file);
+      toast.success('Opportunities imported successfully!');
+      onClose();
+    } catch (error) {
+      console.error('Import error:', error);
+      const errorMessage = error.response?.data?.message || 
+                         error.message || 
+                         'Failed to import opportunities. Please try again.';
+      toast.error(`Import failed: ${errorMessage}`);
     }
   };
 
-  const downloadTemplate = () => {
-    // Create a sample CSV content
-    const csvContent = [
-      'Client Name,Email,Phone,Status,Region',
-      'Example Client,example@client.com,1234567890,Active,North',
-      'Another Client,another@client.com,0987654321,Inactive,South'
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('hidden', '');
-    a.setAttribute('href', url);
-    a.setAttribute('download', 'client_import_template.csv');
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const downloadTemplate = async (e) => {
+    e?.stopPropagation();
+    try {
+      const templateBlob = await onDownloadTemplate();
+      saveAs(templateBlob, 'opportunities_import_template.xlsx');
+      toast.success('Template downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      toast.error('Failed to download template. Please try again.');
+    }
   };
 
   if (!isOpen) return null;
@@ -120,7 +129,7 @@ export default function ImportCSVModal({ isOpen, onClose, onFileSelect, title = 
                 type="file"
                 ref={fileInputRef}
                 className="hidden"
-                accept=".csv"
+                accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
                 onChange={handleFileInput}
               />
             </div>

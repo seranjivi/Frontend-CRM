@@ -53,7 +53,36 @@ const opportunityService = {
       console.error(`Error deleting opportunity ${id}:`, error);
       throw error;
     }
+  },
+  downloadTemplate: async () => {
+  try {
+    const response = await api.get('/opportunities/template', {
+      responseType: 'blob', // Important for file downloads
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error downloading template:', error);
+    throw error;
   }
+},
+// Import opportunities from CSV file
+importOpportunities: async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await api.post('/opportunities/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error importing opportunities:', error);
+    throw error;
+  }
+}
 };
 
 export default opportunityService;
