@@ -43,7 +43,6 @@ export default function ImportCSVModal({ isOpen, onClose, onFileSelect, onDownlo
       
       if (isValidFileType) {
         setFile(selectedFile);
-        onFileSelect(selectedFile);
       } else {
         toast.error('Please upload a valid CSV or Excel file (.csv, .xlsx)');
         if (fileInputRef.current) {
@@ -60,12 +59,14 @@ export default function ImportCSVModal({ isOpen, onClose, onFileSelect, onDownlo
       const response = await onFileSelect(file);
       toast.success('Opportunities imported successfully!');
       onClose();
+      return response;
     } catch (error) {
       console.error('Import error:', error);
       const errorMessage = error.response?.data?.message || 
                          error.message || 
                          'Failed to import opportunities. Please try again.';
       toast.error(`Import failed: ${errorMessage}`);
+      throw error;
     }
   };
 

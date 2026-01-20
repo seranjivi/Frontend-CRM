@@ -112,7 +112,11 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
       opportunity_name: '',
       client_name: '',
       closeDate: '',
-      amount: 0,
+      start_date: '',
+      sales_owner: '',
+      technical_poc: '',
+      presales_poc: '',
+      amount: '',
       currency: 'USD',
       leadSource: '',
       partnerOrganization: '',
@@ -147,6 +151,31 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   };
 
   const [formData, setFormData] = useState(defaultFormData);
+  const [users, setUsers] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
+  // Fetch users for dropdowns
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setIsLoadingUsers(true);
+        // Replace this with your actual API call to fetch users
+        // const response = await userService.getUsers();
+        // setUsers(response.data);
+        setUsers([
+          { id: '1', name: 'John Doe', role: 'sales' },
+          { id: '2', name: 'Jane Smith', role: 'technical' },
+          { id: '3', name: 'Mike Johnson', role: 'presales' },
+        ]);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   // Update form data when opportunity prop changes
   useEffect(() => {
@@ -159,7 +188,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           opportunity_name: opportunity.opportunity?.opportunity_name || '',
           client_name: opportunity.opportunity?.client_name || 'Unknown Client',
           closeDate: opportunity.opportunity?.closeDate || '',
-          amount: opportunity.opportunity?.amount || 0,
+          amount: opportunity.opportunity?.amount || '',
           currency: opportunity.opportunity?.currency || 'USD',
           leadSource: opportunity.opportunity?.leadSource || '',
           type: opportunity.opportunity?.type || 'New Business',
@@ -229,8 +258,10 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     if (!formData.opportunity.closeDate) {
       errors.closeDate = 'Close date is required';
     }
-    if (!formData.opportunity.amount || formData.opportunity.amount <= 0) {
-      errors.amount = 'Valid amount is required';
+    if (formData.opportunity.amount === '' || formData.opportunity.amount === null || formData.opportunity.amount === undefined) {
+      errors.amount = 'Amount is required';
+    } else if (parseFloat(formData.opportunity.amount) <= 0) {
+      errors.amount = 'Amount must be greater than 0';
     }
     if (formData.opportunity.triaged !== 'Drop' && !formData.opportunity.pipelineStatus) {
       errors.pipelineStatus = 'Pipeline status is required';
@@ -324,6 +355,25 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
       // Original opportunity creation/update logic
       const isEdit = !!opportunity?.id || !!opportunity?.opportunity?.id;
       const opportunityId = opportunity?.id || opportunity?.opportunity?.id;
+      
+      // Check for existing opportunity with the same name for new records
+      if (!isEdit) {
+        try {
+          const existingOpportunities = await opportunityService.getOpportunities();
+          const duplicate = existingOpportunities.data.some(
+            opp => opp.opportunity_name.toLowerCase() === formData.opportunity.opportunity_name.toLowerCase()
+          );
+          
+          if (duplicate) {
+            toast.error('An opportunity with this name already exists');
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking for duplicate opportunities:', error);
+          toast.error('Error checking for duplicate opportunities');
+          return;
+        }
+      }
 
       // Format the closeDate properly
       let closeDate = formData.opportunity.closeDate;
@@ -335,6 +385,19 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         // Ensure we have a valid date string
         closeDate = closeDate.split('T')[0];
       }
+      
+      // Format amount - convert empty string to null
+      const amount = formData.opportunity.amount === '' ? null : parseFloat(formData.opportunity.amount);
+
+      // Format start_date to YYYY-MM-DD only
+      let startDate = null;
+      if (formData.opportunity.start_date) {
+        if (formData.opportunity.start_date instanceof Date) {
+          startDate = formData.opportunity.start_date.toISOString().split('T')[0];
+        } else if (typeof formData.opportunity.start_date === 'string') {
+          startDate = formData.opportunity.start_date.split('T')[0];
+        }
+      }
 
       // Prepare the data with all required fields
       const opportunityData = {
@@ -342,7 +405,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         opportunity_name: formData.opportunity.opportunity_name || 'New Opportunity',
         client_name: formData.opportunity.client_name || 'Unknown Client',
         close_date: closeDate,
-        amount: parseFloat(formData.opportunity.amount) || 0,
+        amount: amount,
         amount_currency: formData.opportunity.currency || 'USD',
         
         // Optional fields with defaults
@@ -352,7 +415,11 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                        (formData.opportunity.triaged === 'Drop' ? 'Drop' : 'Hold'),
         pipeline_status: formData.opportunity.pipelineStatus || 'Proposal Work-in-Progress',
         win_probability: parseInt(formData.opportunity.winProbability) || 20,
-        user_name: formData.opportunity.createdBy || 'System'
+        user_name: formData.opportunity.createdBy || 'System',
+        start_date: startDate,
+        sales_owner: formData.opportunity.sales_owner || null,
+        technical_poc: formData.opportunity.technical_poc || null,
+        presales_poc: formData.opportunity.presales_poc || null
       };
 
       console.log('Submitting opportunity data:', JSON.stringify({
@@ -456,15 +523,45 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      return date.toLocaleString('en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (e) {
+      console.error('Error formatting date:', e);
+      return '';
+    }
+  };
+
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      return date.toISOString().split('T')[0];
+    } catch (e) {
+      console.error('Error formatting date for input:', e);
+      return '';
+    }
+  };
+
+  const parseDateInput = (dateString) => {
+    if (!dateString) return null;
+    try {
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? null : date.toISOString();
+    } catch (e) {
+      console.error('Error parsing date:', e);
+      return null;
+    }
   };
 
   return (
@@ -520,23 +617,21 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
+                  <div>
                     <Label htmlFor="opportunity_name">Opportunity Name *</Label>
-                    <div>
-                      <Input
-                        id="opportunity_name"
-                        value={formData.opportunity.opportunity_name}
-                        onChange={(e) => updateOpportunityData('opportunity_name', e.target.value)}
-                        className={formErrors.opportunity_name ? 'border-red-500' : ''}
-                        required
-                      />
-                      {formErrors.opportunity_name && (
-                        <p className="mt-1 text-sm text-red-600">{formErrors.opportunity_name}</p>
-                      )}
-                    </div>
+                    <Input
+                      id="opportunity_name"
+                      value={formData.opportunity.opportunity_name}
+                      onChange={(e) => updateOpportunityData('opportunity_name', e.target.value)}
+                      placeholder="Enter opportunity name"
+                      className={`w-full ${formErrors.opportunity_name ? 'border-red-500' : ''}`}
+                    />
+                    {formErrors.opportunity_name && (
+                      <p className="text-red-500 text-sm mt-1">{formErrors.opportunity_name}</p>
+                    )}
                   </div>
 
-                  <div className="space-y-2">
+                  <div>
                     <Label htmlFor="client">Client *</Label>
                     <select
                       id="client"
@@ -560,6 +655,24 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                     )}
                   </div>
 
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div>
+                      <Label>Start Date</Label>
+                      <input
+                        type="date"
+                        value={formatDateForInput(formData.opportunity.start_date)}
+                        onChange={(e) => {
+                          const selectedDate = parseDateInput(e.target.value);
+                          updateOpportunityData('start_date', selectedDate);
+                        }}
+                        max={formData.opportunity.closeDate ? formatDateForInput(formData.opportunity.closeDate) : ''}
+                        className="w-full p-2 border rounded border-gray-300"
+                      />
+                    </div>
+                  </div>
                   <div>
                     <div>
                       <Label>Close Date *</Label>
@@ -568,9 +681,9 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       )}
                       <input
                         type="date"
-                        value={formData.opportunity.closeDate ? new Date(formData.opportunity.closeDate).toISOString().split('T')[0] : ''}
+                        value={formatDateForInput(formData.opportunity.closeDate)}
                         onChange={(e) => {
-                          const selectedDate = e.target.value ? new Date(e.target.value).toISOString() : '';
+                          const selectedDate = parseDateInput(e.target.value);
                           updateOpportunityData('closeDate', selectedDate);
                           if (formErrors.closeDate) {
                             setFormErrors(prev => {
@@ -580,7 +693,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                             });
                           }
                         }}
-                        min={new Date().toISOString().split('T')[0]}
+                        min={formatDateForInput(new Date())}
                         className={`w-full p-2 border rounded ${formErrors.closeDate ? 'border-red-500' : 'border-gray-300'}`}
                         required
                       />
@@ -614,7 +727,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                           min="0"
                           step="0.01"
                           value={formData.opportunity.amount}
-                          onChange={(e) => updateOpportunityData('amount', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => updateOpportunityData('amount', e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
                           placeholder="0.00"
                           className="rounded-l-none"
                           required
@@ -689,7 +802,62 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       />
                     </div>
                   )}
+    <div>
+                    <Label htmlFor="sales_owner">Sales Owner</Label>
+                    <Select
+                      value={formData.opportunity.sales_owner}
+                      onValueChange={(value) => updateOpportunityData('sales_owner', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select sales owner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.filter(user => user.role === 'sales').map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
+                  <div>
+                    <Label htmlFor="technical_poc">Technical POC</Label>
+                    <Select
+                      value={formData.opportunity.technical_poc}
+                      onValueChange={(value) => updateOpportunityData('technical_poc', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select technical POC" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.filter(user => user.role === 'technical').map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="presales_poc">Presales POC</Label>
+                    <Select
+                      value={formData.opportunity.presales_poc}
+                      onValueChange={(value) => updateOpportunityData('presales_poc', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select presales POC" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.filter(user => user.role === 'presales').map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   {/* Triaged */}
                   <div>
                     <Label htmlFor="triaged">Triaged *</Label>

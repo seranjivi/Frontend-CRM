@@ -566,7 +566,7 @@ const Opportunities = () => {
       const response = await opportunityService.importOpportunities(file);
       console.log('Import response:', response);
       toast.success('Opportunities imported successfully!');
-      fetchOpportunities(); // Refresh the list
+      fetchOpportunities(); 
       setShowImportModal(false);
       return response;
     } catch (error) {
