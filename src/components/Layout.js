@@ -40,16 +40,18 @@ const Layout = ({ children }) => {
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [opportunitiesOpen, setOpportunitiesOpen] = useState(true);
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Client', href: '/clients', icon: Building2 },
-    { name: 'Client Overview', href: '/client-overview', icon: Users },
-    { name: 'Sales Activity', href: '/sales-activity', icon: Activity },
-    { name: 'Lead', href: '/leads', icon: Target },
+  // Define all possible navigation items
+  const allNavigationItems = [
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission: 'dashboard' },
+    { name: 'Client', href: '/clients', icon: Building2, permission: 'clients' },
+    { name: 'Client Overview', href: '/client-overview', icon: Users, permission: 'client_overview' },
+    { name: 'Sales Activity', href: '/sales-activity', icon: Activity, permission: 'sales_activity' },
+    { name: 'Leads', href: '/leads', icon: Target, permission: 'leads' },
     { 
       name: 'Opportunities', 
       href: '/opportunities', 
       icon: TrendingUp,
+      permission: 'opportunities',
       subItems: [
         { name: 'All Opportunities', href: '/opportunities' },
         { name: 'RFP Details', href: '/rfp-details' },
@@ -61,12 +63,40 @@ const Layout = ({ children }) => {
       name: 'Projects',
       href: '/projects',
       icon: FolderKanban,
+      permission: 'projects',
       children: [{ name: 'Hiring Request', href: '/projects/hiring-requests' }],
     },
-    { name: 'Action Items', href: '/action-items', icon: Target },
-    { name: 'User Management', href: '/user-management', icon: UserCog },
-    { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Action Items', href: '/action-items', icon: Target, permission: 'action_items' },
+    { name: 'User Management', href: '/user-management', icon: UserCog, permission: 'user_management' },
+    { name: 'Settings', href: '/settings', icon: Settings, permission: 'settings' },
   ];
+
+  // Filter navigation items based on user permissions
+  const navigation = allNavigationItems.filter(item => {
+    // Always show Dashboard for all authenticated users
+    if (item.permission === 'dashboard') return true;
+    
+    // If user is admin, show specific tabs including leads
+    if (user?.role === 'Admin') {
+      return ['clients', 'opportunities', 'user_management', 'leads'].includes(item.permission);
+    }
+    
+    // If user is Sales Head, show only Dashboard and Clients
+    if (user?.role === 'Sales Head') {
+      return ['clients', 'dashboard'].includes(item.permission);
+    }
+    
+    // If user is Presales Member, show Dashboard, Clients, and Opportunities
+    if (user?.role === 'Presales Member') {
+      return ['clients', 'opportunities', 'dashboard'].includes(item.permission);
+    }
+    
+    // If no permissions object, show all items (for backward compatibility)
+    if (!user?.permissions?.allowedModules) return true;
+    
+    // Check if user has permission for this item
+    return user.permissions.allowedModules.includes(item.permission);
+  });
 
   const getInitials = (name) => {
     return name

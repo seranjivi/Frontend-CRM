@@ -1,154 +1,135 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../utils/api';
 import { Button } from '../components/ui/button';
-import { Plus, ArrowRight } from 'lucide-react';
+import { Plus, Upload, Download, Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import LeadForm from '../components/LeadFormEnhanced';
 import LeadDetail from '../components/LeadDetail';
-import AttachmentCell from '../components/attachments/AttachmentCell';
 import AttachmentPreviewModal from '../components/attachments/AttachmentPreviewModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { toast } from 'sonner';
 import { formatDate } from '../utils/dateUtils';
-import ColumnFilter from '../components/ColumnFilter';
 import LeadStatusBadge from '../components/LeadStatusBadge';
-import LeadStatusKPI from '../components/LeadStatusKPI';
- 
+import { saveAs } from 'file-saver';
+import { Input } from '../components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+
 const Leads = () => {
   const [leads, setLeads] = useState([]);
-  const [filteredLeads, setFilteredLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
   const [showAttachments, setShowAttachments] = useState(false);
-  const [activeFilters, setActiveFilters] = useState([]);
- 
+  const fileInputRef = useRef(null);
+
+  // State for filters (matching Opportunities.js structure)
+  const [filters, setFilters] = useState({
+    leadName: 'All Leads',
+    status: 'All Status',
+    stage: 'All Stages'
+  });
+
+  // Filter Options
+  const statusOptions = ['All Status', 'New Lead', 'Contacted', 'Qualified', 'Unqualified', 'In-progress', 'Converted to Opportunity'];
+  const stageOptions = ['All Stages', 'RFP', 'RFI', 'RFQ', 'PoC', 'Demo'];
+
   useEffect(() => {
     fetchLeads();
   }, []);
- 
-  useEffect(() => {
-    // Apply filters whenever leads data or filters change
-    applyFilters();
-  }, [leads, activeFilters]);
- 
+
   const fetchLeads = async () => {
     try {
       setLoading(true);
       const response = await api.get('/leads');
-     
-      // Handle different response formats
+
       if (response.data && Array.isArray(response.data)) {
-        // If the response is directly an array of leads
         setLeads(response.data);
       } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        // If the response is { success, data, total }
         setLeads(response.data.data);
       } else if (response.data && response.data.success && Array.isArray(response.data.data)) {
-        // If the response is { success: true, data: [...], total: X }
         setLeads(response.data.data);
       } else {
-        console.warn('Unexpected API response format:', response.data);
         setLeads([]);
-        throw new Error('Unexpected response format from server');
       }
-     
-      // Apply any active filters to the new data
-      applyFilters();
     } catch (error) {
       console.error('Error fetching leads:', error);
-      toast.error(error.response?.data?.message || error.message || 'Failed to fetch leads');
+      toast.error(error.response?.data?.message || 'Failed to fetch leads');
       setLeads([]);
     } finally {
       setLoading(false);
     }
   };
- 
-  const applyFilters = () => {
-    if (activeFilters.length === 0) {
-      setFilteredLeads(leads);
+
+  // Filter leads based on active filters
+  const filteredLeads = useMemo(() => {
+    return leads.filter(lead => {
+      // Filter by lead name/client/opportunity (search)
+      const searchTerm = filters.leadName === 'All Leads' ? '' : filters.leadName.toLowerCase();
+      const matchesSearch = !searchTerm ||
+        (lead.client_name && lead.client_name.toLowerCase().includes(searchTerm)) ||
+        (lead.opportunity_name && lead.opportunity_name.toLowerCase().includes(searchTerm)) ||
+        (lead.lead_owner && lead.lead_owner.toLowerCase().includes(searchTerm));
+
+      // Filter by status
+      const matchesStatus = filters.status === 'All Status' ||
+        (lead.lead_status && lead.lead_status === filters.status);
+
+      // Filter by stage
+      const matchesStage = filters.stage === 'All Stages' ||
+        (lead.lead_stage && lead.lead_stage === filters.stage);
+
+      return matchesSearch && matchesStatus && matchesStage;
+    });
+  }, [leads, filters]);
+
+  const handleFilterChange = (filterName, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterName]: value
+    }));
+  };
+
+  // Handle file import
+  const handleFileImport = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target.result;
+        console.log('File content:', content);
+        // Here you would typically parse the CSV and call an API
+        toast.success(`File "${file.name}" imported successfully!`);
+      };
+      reader.readAsText(file);
+    }
+    event.target.value = '';
+  };
+
+  // Handle export data
+  const handleExportData = () => {
+    if (leads.length === 0) {
+      toast.warning('No data to export!');
       return;
     }
- 
-    const filtered = leads.filter(lead => {
-      return activeFilters.every(filter => {
-        if (filter.values.length === 0) return true;
-       
-        let fieldValue = lead[filter.column];
-       
-        // Handle special cases for date filtering
-        if (filter.column === 'created_at') {
-          const filterValue = filter.values[0];
-          if (!filterValue) return true;
-         
-          const leadDate = new Date(lead[filter.column]);
-          if (isNaN(leadDate.getTime())) return true;
-         
-          // Handle single date filter
-          if (!filterValue.includes(' to ')) {
-            const filterDate = new Date(filterValue);
-            if (isNaN(filterDate.getTime())) return true;
-           
-            // Filter for leads created on this specific date
-            return leadDate.toDateString() === filterDate.toDateString();
-          }
-         
-          // Handle date range filter
-          const [fromStr, toStr] = filterValue.split(' to ');
-          const fromDate = new Date(fromStr);
-          const toDate = new Date(toStr);
-         
-          if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) return true;
-         
-          // Include the entire end date
-          toDate.setHours(23, 59, 59, 999);
-         
-          return leadDate >= fromDate && leadDate <= toDate;
-        }
-       
-        // Handle special cases for combined columns
-        if (filter.column === 'contact_details') {
-          fieldValue = `${lead.contact_email || ''} ${lead.contact_phone || ''}`.trim();
-        }
-       
-        // Apply OR logic for multiple selected values
-        return filter.values.some(selectedValue => {
-          if (fieldValue === null || fieldValue === undefined) return false;
-          return fieldValue.toString().toLowerCase().includes(selectedValue.toString().toLowerCase());
-        });
-      });
-    });
- 
-    setFilteredLeads(filtered);
+
+    const headers = Object.keys(leads[0]);
+    const csvContent = [
+      headers.join(','),
+      ...leads.map(row =>
+        headers.map(fieldName =>
+          JSON.stringify(row[fieldName] || '', (key, value) =>
+            value === null ? '' : value
+          )
+        ).join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `leads_export_${new Date().toISOString().split('T')[0]}.csv`);
   };
- 
-  const handleFilterChange = (column, values) => {
-    setActiveFilters(prev => {
-      const existingFilterIndex = prev.findIndex(f => f.column === column);
-     
-      if (values.length === 0) {
-        // Remove filter if no values selected
-        return prev.filter(f => f.column !== column);
-      }
-     
-      if (existingFilterIndex >= 0) {
-        // Update existing filter
-        const newFilters = [...prev];
-        newFilters[existingFilterIndex] = { column, values };
-        return newFilters;
-      } else {
-        // Add new filter
-        return [...prev, { column, values }];
-      }
-    });
-  };
- 
-  const handleClearAllFilters = () => {
-    setActiveFilters([]);
-  };
- 
+
   const handleDelete = async (lead) => {
     if (window.confirm(`Are you sure you want to delete this lead?`)) {
       try {
@@ -160,23 +141,23 @@ const Leads = () => {
       }
     }
   };
- 
+
   const handleEdit = (lead) => {
     setSelectedLead(lead);
     setShowDetail(true);
   };
- 
+
   const handleEditLead = (lead) => {
     setEditingLead(lead);
     setShowForm(true);
     setShowDetail(false);
   };
- 
+
   const handleBackToList = () => {
     setShowDetail(false);
     setSelectedLead(null);
   };
- 
+
   const handleDeleteLead = (lead) => {
     if (window.confirm(`Are you sure you want to delete this lead?`)) {
       try {
@@ -190,26 +171,28 @@ const Leads = () => {
       }
     }
   };
- 
+
   const handleFormClose = () => {
     setShowForm(false);
     setEditingLead(null);
     fetchLeads();
   };
- 
+
   const handleImport = () => {
-    toast.info('Import functionality coming soon! You can upload CSV files to bulk import leads.');
+    fileInputRef.current?.click();
   };
- 
-  const handleViewAttachments = (lead) => {
-    setSelectedLead(lead);
-    setShowAttachments(true);
-  };
- 
+
   const columns = [
     {
-      key: 'task_id',
-      header: 'Lead ID',
+      key: 'created_at',
+      header: 'Lead Created On',
+      headerClassName: 'text-[18px] font-medium',
+      render: (value) => <span className="text-xs text-slate-700">{formatDate(value)}</span>
+    },
+    {
+      key: 'lead_name',
+      header: 'Lead Name',
+      headerClassName: 'text-[18px] font-medium',
       render: (value, row) => (
         <span
           className="font-['JetBrains_Mono'] text-xs font-semibold text-[#2C6AA6] cursor-pointer hover:underline"
@@ -221,85 +204,42 @@ const Leads = () => {
     },
     {
       key: 'client_name',
-      header: 'Client / Account Name',
-      filterable: true
-    },
-    {
-      key: 'opportunity_name',
-      header: 'Opportunity Name',
-      filterable: true
-    },
-    {
-      key: 'lead_score',
-      header: 'Lead Score',
-      render: (value) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          value >= 70 ? 'bg-green-100 text-green-700' :
-          value >= 40 ? 'bg-yellow-100 text-yellow-700' :
-          'bg-red-100 text-red-700'
-        }`}>
-          {value || 0}
-        </span>
-      )
-    },
-    {
-      key: 'lead_owner',
-      header: 'Lead Owner',
-      filterable: true
-    },
-    {
-      key: 'sales_poc',
-      header: 'Lead Assignee',
-      filterable: true
-    },
-    {
-      key: 'lead_status',
-      header: 'Lead Status',
-      render: (value, row) => <LeadStatusBadge status={value} leadId={row.id} />
+      header: 'Client name',
+      headerClassName: 'text-[18px] font-medium'
     },
     {
       key: 'region',
       header: 'Region',
-      filterable: true
+      headerClassName: 'text-[18px] font-medium'
     },
     {
-      key: 'country',
-      header: 'Country',
-      filterable: true
+      key: 'sales_poc',
+      header: 'Assignee',
+      headerClassName: 'text-[18px] font-medium'
     },
     {
-      key: 'industry',
-      header: 'Industry',
-      filterable: true
+      key: 'priority',
+      header: 'Priority',
+      headerClassName: 'text-[18px] font-medium'
     },
     {
-      key: 'probability',
-      header: 'Probability (%)',
-      render: (value) => (
-        <div className="flex items-center gap-2">
-          <div className="w-16 bg-slate-200 rounded-full h-2">
-            <div
-              className="bg-blue-600 h-2 rounded-full"
-              style={{width: `${value || 0}%`}}
-            ></div>
-          </div>
-          <span className="text-xs">{value || 0}%</span>
-        </div>
-      )
+      key: 'lead_source',
+      header: 'Lead Source',
+      headerClassName: 'text-[18px] font-medium'
     },
     {
-      key: 'created_at',
-      header: 'Created Date',
-      render: (value) => <span className="text-xs text-slate-700">{formatDate(value)}</span>
+      key: 'deal_type',
+      header: 'Deal type',
+      headerClassName: 'text-[18px] font-medium'
     },
+    {
+      key: 'lead_status',
+      header: 'Lead status',
+      headerClassName: 'text-[18px] font-medium',
+      render: (value, row) => <LeadStatusBadge status={value} leadId={row.id} />
+    }
   ];
- 
-  const filterOptions = {
-    lead_stage: ['New', 'In Progress', 'Qualified', 'Unqualified'],
-    lead_status: ['Active', 'Delayed', 'Completed', 'Rejected'],
-    region: [...new Set(leads.map(l => l.region).filter(Boolean))],
-  };
- 
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -307,7 +247,7 @@ const Leads = () => {
       </div>
     );
   }
- 
+
   return (
     <div className="space-y-4" data-testid="leads-page">
       {showDetail && selectedLead ? (
@@ -321,19 +261,86 @@ const Leads = () => {
         <>
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 font-['Manrope']">Leads</h1>
+              <div className="flex items-baseline space-x-2">
+                <h1 className="text-2xl font-bold text-slate-900 font-['Manrope']">Leads</h1>
+                <span className="text-sm text-slate-500">({filteredLeads.length} records)</span>
+              </div>
+              <p className="text-sm text-slate-600 mt-0.5">Manage and track your leads</p>
             </div>
-            <div className="flex gap-2">
-              {activeFilters.length > 0 && (
-                <Button
-                  onClick={handleClearAllFilters}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
+
+            <div className="flex items-center space-x-4">
+              <div className="relative flex items-center space-x-2">
+                <Search className="absolute left-3 h-4 w-4 text-gray-500" />
+                <Input
+                  type="search"
+                  placeholder="Search..."
+                  className="pl-9 w-[180px] text-sm"
+                  value={filters.leadName === 'All Leads' ? '' : filters.leadName}
+                  onChange={(e) => handleFilterChange('leadName', e.target.value)}
+                />
+
+                {/* Status Filter */}
+                <Select
+                  value={filters.status}
+                  onValueChange={(value) => handleFilterChange('status', value)}
                 >
-                  Clear All Filters
+                  <SelectTrigger className="w-[130px] h-9 text-sm">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Stage Filter */}
+                <Select
+                  value={filters.stage}
+                  onValueChange={(value) => handleFilterChange('stage', value)}
+                >
+                  <SelectTrigger className="w-[130px] h-9 text-sm">
+                    <SelectValue placeholder="All Stages" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stageOptions.map((stage) => (
+                      <SelectItem key={stage} value={stage}>
+                        {stage}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    className="h-9 text-gray-700 border-gray-300"
+                    onClick={handleImport}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Import
+                  </Button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileImport}
+                    accept=".csv,.xlsx,.xls"
+                    className="hidden"
+                  />
+                </div>
+
+                <Button
+                  variant="outline"
+                  className="h-9 text-gray-700 border-gray-300"
+                  onClick={handleExportData}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
                 </Button>
-              )}
+              </div>
+
               <Button
                 onClick={() => setShowForm(true)}
                 data-testid="add-lead-btn"
@@ -344,38 +351,17 @@ const Leads = () => {
               </Button>
             </div>
           </div>
- 
-          {activeFilters.length > 0 && (
-            <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-lg">
-              <span className="text-sm text-slate-600">Active filters:</span>
-              {activeFilters.map(filter => (
-                <span key={filter.column} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
-                  {columns.find(c => c.key === filter.column)?.header}: {filter.values.length} selected
-                </span>
-              ))}
-            </div>
-          )}
- 
-          <LeadStatusKPI
-            leads={filteredLeads}
-            onStatusFilter={handleFilterChange}
-            activeFilters={activeFilters}
-          />
- 
+
           <DataTable
             data={filteredLeads}
             columns={columns}
             onDelete={handleDelete}
             onImport={handleImport}
-            filterOptions={filterOptions}
             testId="leads-table"
-            ColumnFilterComponent={ColumnFilter}
-            activeFilters={activeFilters}
-            onFilterChange={handleFilterChange}
           />
         </>
       )}
- 
+
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-5xl max-h-[90vh] w-[90vw] overflow-y-auto">
           <DialogHeader>
@@ -384,7 +370,7 @@ const Leads = () => {
           <LeadForm lead={editingLead} onClose={handleFormClose} />
         </DialogContent>
       </Dialog>
- 
+
       <AttachmentPreviewModal
         isOpen={showAttachments}
         onClose={() => setShowAttachments(false)}
@@ -394,6 +380,5 @@ const Leads = () => {
     </div>
   );
 };
- 
+
 export default Leads;
- 

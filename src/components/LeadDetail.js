@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { ArrowLeft, Mail, Phone, Calendar, User, Building, Globe, Target, Activity, FileText, Paperclip } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Calendar, User, Building, Globe, Target, Activity, FileText, Paperclip, MessageSquareText } from 'lucide-react';
 import { formatDate } from '../utils/dateUtils';
 import AttachmentCell from './attachments/AttachmentCell';
 import AttachmentPreviewModal from './attachments/AttachmentPreviewModal';
@@ -26,24 +26,19 @@ const LeadDetail = ({ lead, onBack, onEdit, onDelete }) => {
 
   const getLeadStatusColor = (status) => {
     const colors = {
-      New: 'bg-blue-100 text-blue-700',
-      Qualified: 'bg-emerald-100 text-emerald-700',
-      Dormant: 'bg-amber-100 text-amber-700',
-      Lost: 'bg-red-100 text-red-700',
-      Converted: 'bg-purple-100 text-purple-700',
+      'New Lead': 'bg-blue-100 text-blue-700',
+      'Contacted': 'bg-purple-100 text-purple-700',
+      'Qualified': 'bg-emerald-100 text-emerald-700',
+      'Unqualified': 'bg-red-100 text-red-700',
+      'In-progress': 'bg-amber-100 text-amber-700',
+      'Converted to Opportunity': 'bg-green-100 text-green-700',
     };
     return colors[status] || 'bg-slate-100 text-slate-700';
   };
 
   const getSalesStageColor = (stage) => {
-    const colors = {
-      Qualification: 'bg-blue-100 text-blue-700',
-      Proposal: 'bg-yellow-100 text-yellow-700',
-      Negotiation: 'bg-orange-100 text-orange-700',
-      'Closed Won': 'bg-green-100 text-green-700',
-      'Closed Lost': 'bg-red-100 text-red-700',
-    };
-    return colors[stage] || 'bg-slate-100 text-slate-700';
+    // Assuming stages might map somewhat to status or use a separate set if refined later
+    return 'bg-slate-100 text-slate-700';
   };
 
   return (
@@ -56,7 +51,7 @@ const LeadDetail = ({ lead, onBack, onEdit, onDelete }) => {
             Back to Leads
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">{lead.opportunity_name}</h1>
+            <h1 className="text-2xl font-bold text-slate-900">{lead.lead_name || lead.opportunity_name}</h1>
             <p className="text-slate-600">{lead.client_name}</p>
           </div>
         </div>
@@ -94,9 +89,9 @@ const LeadDetail = ({ lead, onBack, onEdit, onDelete }) => {
                 <p className="text-2xl font-bold">{lead.probability || 0}%</p>
               </div>
               <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center">
-                <div 
-                  className="w-10 h-10 rounded-full bg-blue-600" 
-                  style={{width: `${(lead.probability || 0) / 100 * 48}px`, height: `${(lead.probability || 0) / 100 * 48}px`}}
+                <div
+                  className="w-10 h-10 rounded-full bg-blue-600"
+                  style={{ width: `${(lead.probability || 0) / 100 * 48}px`, height: `${(lead.probability || 0) / 100 * 48}px` }}
                 ></div>
               </div>
             </div>
@@ -108,7 +103,9 @@ const LeadDetail = ({ lead, onBack, onEdit, onDelete }) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-600">Est. Value</p>
-                <p className="text-2xl font-bold">{lead.currency || 'USD'} {lead.estimated_value?.toLocaleString() || 0}</p>
+                <p className="text-2xl font-bold">
+                  {lead.currency} {lead.estimated_deal_value?.toLocaleString() || lead.estimated_value?.toLocaleString() || 0}
+                </p>
               </div>
               <Target className="h-8 w-8 text-slate-400" />
             </div>
@@ -120,13 +117,10 @@ const LeadDetail = ({ lead, onBack, onEdit, onDelete }) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-600">Status</p>
-                <Badge className={getLeadStatusColor(lead.lead_status)}>
-                  {lead.lead_status}
+                <Badge className={getLeadStatusColor(lead.lead_status || lead.status)}>
+                  {lead.lead_status || lead.status}
                 </Badge>
               </div>
-              <Badge className={getSalesStageColor(lead.sales_stage)}>
-                {lead.sales_stage}
-              </Badge>
             </div>
           </CardContent>
         </Card>
@@ -155,23 +149,28 @@ const LeadDetail = ({ lead, onBack, onEdit, onDelete }) => {
                 </div>
                 <div className="flex items-center gap-2">
                   <Target className="h-4 w-4 text-slate-400" />
-                  <span className="text-sm text-slate-600">Opportunity:</span>
-                  <span className="font-medium">{lead.opportunity_name}</span>
+                  <span className="text-sm text-slate-600">Lead Name:</span>
+                  <span className="font-medium">{lead.lead_name || lead.opportunity_name}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-slate-400" />
-                  <span className="text-sm text-slate-600">Owner:</span>
-                  <span className="font-medium">{lead.sales_poc}</span>
+                  <span className="text-sm text-slate-600">Assigned To:</span>
+                  <span className="font-medium">{lead.assigned_to || lead.sales_poc}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Globe className="h-4 w-4 text-slate-400" />
-                  <span className="text-sm text-slate-600">Source:</span>
-                  <span className="font-medium">{lead.lead_source}</span>
+                  <span className="text-sm text-slate-600">Deal Type:</span>
+                  <span className="font-medium">{lead.deal_type}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Building className="h-4 w-4 text-slate-400" />
                   <span className="text-sm text-slate-600">Industry:</span>
                   <span className="font-medium">{lead.industry}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-slate-400" />
+                  <span className="text-sm text-slate-600">Priority:</span>
+                  <span className="font-medium">{lead.priority}</span>
                 </div>
               </CardContent>
             </Card>
@@ -209,16 +208,6 @@ const LeadDetail = ({ lead, onBack, onEdit, onDelete }) => {
                   <span className="text-sm text-slate-600">Next Follow-up:</span>
                   <span className="font-medium">{lead.next_followup ? formatDate(lead.next_followup) : 'Not set'}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-slate-400" />
-                  <span className="text-sm text-slate-600">Expected Closure:</span>
-                  <span className="font-medium">{lead.expected_closure_date ? formatDate(lead.expected_closure_date) : 'Not set'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-slate-400" />
-                  <span className="text-sm text-slate-600">Last Updated:</span>
-                  <span className="font-medium">{lead.last_updated ? formatDate(lead.last_updated) : 'Never'}</span>
-                </div>
               </CardContent>
             </Card>
 
@@ -240,7 +229,7 @@ const LeadDetail = ({ lead, onBack, onEdit, onDelete }) => {
                 <CardTitle className="text-lg">Contact Person</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-slate-600">{lead.contact_person || 'Not specified'}</p>
+                <p className="text-slate-600">{lead.primary_contact || lead.contact_person || 'Not specified'}</p>
               </CardContent>
             </Card>
 
@@ -267,13 +256,34 @@ const LeadDetail = ({ lead, onBack, onEdit, onDelete }) => {
         <TabsContent value="activities" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Recent Activities</CardTitle>
+              <CardTitle className="text-lg">Activity History</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-slate-500">
-                <Activity className="h-12 w-12 mx-auto mb-4 text-slate-300" />
-                <p>No activities recorded yet</p>
-                <p className="text-sm">Activities will appear here as you interact with this lead</p>
+              <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                {lead.activity_history && Array.isArray(lead.activity_history) && lead.activity_history.length > 0 ? (
+                  lead.activity_history.map((activity, index) => (
+                    <div key={index} className="flex items-start">
+                      <div className="bg-blue-100 rounded-full p-2 mr-3 mt-1">
+                        <MessageSquareText className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1 bg-slate-50 p-3 rounded-lg">
+                        <div className="flex justify-between items-baseline mb-1">
+                          <span className="font-semibold text-sm text-slate-800">{activity.user || 'Unknown User'}</span>
+                          <span className="text-xs text-slate-500">
+                            {activity.timestamp ? new Date(activity.timestamp).toLocaleString() : 'Unknown Time'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{activity.text}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-slate-500">
+                    <Activity className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+                    <p>No activities recorded yet</p>
+                    <p className="text-sm">Activities will appear here as you interact with this lead</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -285,11 +295,11 @@ const LeadDetail = ({ lead, onBack, onEdit, onDelete }) => {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <FileText className="h-5 w-5" />
-                  Sales Notes
+                  Description / Notes
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-slate-600 whitespace-pre-wrap">{lead.sales_notes || 'No sales notes available'}</p>
+                <p className="text-slate-600 whitespace-pre-wrap">{lead.description || lead.sales_notes || 'No description available'}</p>
               </CardContent>
             </Card>
 
@@ -315,10 +325,11 @@ const LeadDetail = ({ lead, onBack, onEdit, onDelete }) => {
         isOpen={showAttachments}
         onClose={() => setShowAttachments(false)}
         attachments={lead.attachments || []}
-        entityName={lead.opportunity_name || 'Lead'}
+        entityName={lead.lead_name || 'Lead'}
       />
     </div>
   );
 };
 
 export default LeadDetail;
+ 
