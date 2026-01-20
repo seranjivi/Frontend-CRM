@@ -473,18 +473,15 @@ const RFPDetails = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">RFP DETAILS PORTFOLIO</h1>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-2xl font-semibold">RFP Details Portfolio</h1>
+            <span className="text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded-md">
+              {loading ? 'Loading...' : `(${data.length} ${data.length === 1 ? 'record' : 'records'})`}
+            </span>
+          </div>
           <p className="text-sm text-gray-500">Procurement and Submission Tracking</p>
         </div>
         <div className="flex items-center space-x-4">
-          <Button 
-            variant="outline" 
-            className="h-9 text-gray-700 border-gray-300"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            Import
-          </Button>
           <Button 
             variant="outline" 
             className="h-9 text-gray-700 border-gray-300"

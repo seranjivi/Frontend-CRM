@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import opportunityService from '../services/opportunityService';
 import { Button } from '../components/ui/button';
 import { Plus, ArrowRight, Filter, Upload, Download, Search, CheckCircle } from 'lucide-react';
+import ImportCSVModal from '../components/ImportCSVModal';
 import DataTable from '../components/DataTable';
 import OpportunityFormTabbed from '../components/OpportunityFormTabbed';
 import AttachmentCell from '../components/attachments/AttachmentCell';
@@ -31,6 +32,8 @@ const Opportunities = () => {
   const [isRFPView, setIsRFPView] = useState(false);
   const [showOnlyDetails, setShowOnlyDetails] = useState(false);
   const [showOnlySOW, setShowOnlySOW] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
 
   // State for filters
@@ -547,23 +550,26 @@ const Opportunities = () => {
               </SelectContent>
             </Select>
             
-            <div className="relative">
-              <Button 
-                variant="outline" 
-                className="h-9 text-gray-700 border-gray-300"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Import
-              </Button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileImport}
-                accept=".csv,.xlsx,.xls"
-                className="hidden"
-              />
-            </div>
+            <Button 
+              variant="outline" 
+              className="h-9 text-gray-700 border-gray-300"
+              onClick={() => setShowImportModal(true)}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Import
+            </Button>
+            <ImportCSVModal
+              isOpen={showImportModal}
+              onClose={() => setShowImportModal(false)}
+              onFileSelect={(file) => {
+                setSelectedFile(file);
+                // You can add your import logic here using the file
+                console.log('Selected file:', file.name);
+                // Call your existing handleFileImport if needed
+                // handleFileImport({ target: { files: [file] } });
+              }}
+              title="Import Opportunities"
+            />
             <Button 
               variant="outline" 
               className="h-9 text-gray-700 border-gray-300"

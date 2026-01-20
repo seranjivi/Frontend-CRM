@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Download, X, Search } from 'lucide-react';
+import { Plus, Download, X, Search, Upload } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import ClientForm from '../components/ClientForm';
 import { Dialog, DialogContent } from '../components/ui/dialog';
 import { toast } from 'sonner';
 import { formatDate } from '../utils/dateUtils';
 import { Button } from '../components/ui/button';
+import ImportCSVModal from '../components/ImportCSVModal';
 import clientService from '../services/clientService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
@@ -16,6 +17,8 @@ const Clients = () => {
   const [editingClient, setEditingClient] = useState(null);
   const [viewingClient, setViewingClient] = useState(null);
   const [clientDetails, setClientDetails] = useState(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [filters, setFilters] = useState({
     region: '',
@@ -437,6 +440,10 @@ const Clients = () => {
     },
   ];
  
+  const handleFileSelect = (file) => {
+    setSelectedFile(file);
+  };
+
   return (
     <div className="container mx-auto py-6 px-4">
       <div className="space-y-4">
@@ -504,7 +511,7 @@ const Clients = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleImport}
+              onClick={() => setShowImportModal(true)}
               className="h-9 text-xs sm:text-sm whitespace-nowrap"
             >
               <Download className="h-3.5 w-3.5 mr-1.5 rotate-180" />
@@ -516,6 +523,7 @@ const Clients = () => {
               accept=".csv,.xlsx"
               onChange={handleFileUpload}
               style={{ display: 'none' }}
+              className="hidden"
             />
             <Button
               variant="outline"
@@ -568,6 +576,13 @@ const Clients = () => {
           />
         </DialogContent>
       </Dialog>
+ 
+      <ImportCSVModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onFileSelect={handleFileSelect}
+        title="Import Clients"
+      />
  
       {viewingClient && (
         <Dialog open={!!viewingClient} onOpenChange={(open) => !open && handleCloseView()}>
