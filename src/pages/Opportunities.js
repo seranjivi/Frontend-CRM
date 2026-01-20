@@ -446,7 +446,7 @@ const Opportunities = () => {
       render: (_, row) => {
         const currentStage = row.approval_stage || APPROVAL_STAGES.LEVEL_1_RFB;
         
-        if (currentStage === APPROVAL_STAGES.APPROVED) {
+        if ((currentStage && currentStage.toString().toLowerCase() === 'approved') || (row.status && row.status.toString().toLowerCase() === 'approved')) {
           return (
             <div className="flex items-center space-x-1 text-emerald-600">
               <CheckCircle className="h-4 w-4" />

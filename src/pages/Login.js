@@ -105,7 +105,7 @@ const Login = () => {
             </form>
 
             <p className="mt-6 text-center text-sm text-slate-600">
-              Demo credentials: <span className="font-mono text-xs">admin@sightspectrum.com / admin123</span>
+              Demo credentials: <span className="font-mono text-xs">john.vom@example.com / Admin@123</span>
             </p>
           </div>
         </div>

@@ -34,7 +34,7 @@ const SOWs = () => {
         const formattedSOWs = response.data.map(sow => ({
           id: `SOW-${sow.sow_id}`,
           title: sow.sow_title,
-          client: 'Client Name', // You might want to fetch client name from opportunity
+          client: sow.client_name || '-', // Using client_name from the API response
           status: sow.sow_status,
           targetKickoffDate: sow.target_kickoff_date,
           value: parseFloat(sow.contract_value) || 0,
@@ -179,13 +179,7 @@ const SOWs = () => {
       key: 'title',
       header: 'SOW Title',
       render: (_, row) => (
-        <div className="flex items-center space-x-2">
-          <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
-          <div>
-            <div className="font-medium text-gray-900">{row.id}</div>
-            <div className="text-sm text-gray-500">{row.title}</div>
-          </div>
-        </div>
+        <div className="font-medium text-gray-900">{row.title}</div>
       ),
     },
     { key: 'client', header: 'Client' },
