@@ -324,7 +324,7 @@ const OpportunityForm = ({ opportunity, onClose }) => {
         </div>
         
         <div>
-          <Label htmlFor="close_date">Close Date</Label>
+          <Label htmlFor="close_date">End Date</Label>
           <Input
             id="close_date"
             name="close_date"

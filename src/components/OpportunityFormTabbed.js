@@ -74,7 +74,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   
   const TRIAGED_OPTIONS = [
     { value: 'Proceed', label: 'Proceed (Go)' },
-    { value: 'Hold', label: 'Hold (Neutral)' },
+    { value: 'Hold', label: 'Hold (Lead)' },
     { value: 'Drop', label: 'Drop (No-Go)' }
   ];
 
@@ -325,13 +325,13 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     
     // Required fields validation
     if (!formData.opportunity.opportunity_name?.trim()) {
-      errors.opportunity_name = 'Opportunity name is required';
+      errors.opportunity_name = 'Name is required';
     }
     if (!formData.opportunity.client_name) {
       errors.client_name = 'Client selection is required';
     }
     if (!formData.opportunity.closeDate) {
-      errors.closeDate = 'Close date is required';
+      errors.closeDate = 'End date is required';
     }
     if (formData.opportunity.amount === '' || formData.opportunity.amount === null || formData.opportunity.amount === undefined) {
       errors.amount = 'Amount is required';
@@ -692,12 +692,12 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           <TabsContent value="details" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Opportunity Details</CardTitle>
+                <CardTitle>Lead Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="opportunity_name">Opportunity Name <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="opportunity_name">Name <span className="text-red-500">*</span></Label>
                     <Input
                       id="opportunity_name"
                       value={formData.opportunity.opportunity_name}
@@ -755,7 +755,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   </div>
                   <div>
                     <div>
-                      <Label>Close Date <span className="text-red-600">*</span></Label>
+                      <Label>End Date <span className="text-red-600">*</span></Label>
                       {formErrors.closeDate && (
                         <p className="text-sm text-red-600 mb-1">{formErrors.closeDate}</p>
                       )}
@@ -1158,7 +1158,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           <TabsContent value="rfp" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>RFP Details</CardTitle>
+                <CardTitle>Opportunity/RFP Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1209,7 +1209,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
 
                   {/* Bid Manager */}
                   <div>
-                    <Label htmlFor="bidManager">Bid Manager</Label>
+                    <Label htmlFor="bidManager">Response Owner</Label>
                     <Input
                       id="bidManager"
                       value={formData.rfpDetails.bidManager}

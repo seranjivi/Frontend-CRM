@@ -78,14 +78,14 @@ const ForecastForm = ({ forecast, onClose }) => {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="opportunity_name">Opportunity Name *</Label>
+          <Label htmlFor="opportunity_name">Name *</Label>
           <Input
             id="opportunity_name"
             name="opportunity_name"
             value={formData.opportunity_name}
             onChange={handleChange}
             required
-            placeholder="Enter opportunity name"
+            placeholder="Enter Lead name"
           />
         </div>
 

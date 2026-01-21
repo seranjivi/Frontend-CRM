@@ -474,7 +474,7 @@ const RFPDetails = () => {
       <div className="flex justify-between items-center mb-6">
         <div>
           <div className="flex items-center space-x-2">
-            <h1 className="text-2xl font-semibold">RFP Details Portfolio</h1>
+            <h1 className="text-2xl font-semibold">Opportunity/RFP Details Portfolio</h1>
             <span className="text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded-md">
               {loading ? 'Loading...' : `(${data.length} ${data.length === 1 ? 'record' : 'records'})`}
             </span>

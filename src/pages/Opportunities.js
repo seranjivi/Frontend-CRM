@@ -38,15 +38,15 @@ const Opportunities = () => {
 
   // State for filters
   const [filters, setFilters] = useState({
-    opportunityName: 'All Opportunities',
+    opportunityName: 'All Leads',
     status: 'All Status',
     client: 'All Clients',
     closeDate: 'All Dates',
-    type: 'All Opportunities'
+    type: 'All Leads'
   });
 
   const statusOptions = ['All Status', 'Active', 'Inactive', 'Won', 'Lost', 'In Progress'];
-  const [opportunityTypeOptions, setOpportunityTypeOptions] = useState(['All Opportunities']);
+  const [opportunityTypeOptions, setOpportunityTypeOptions] = useState(['All Leads']);
 
   // Handle filter changes
   const handleFilterChange = (filterName, value) => {
@@ -60,7 +60,7 @@ const Opportunities = () => {
   const filteredOpportunities = useMemo(() => {
     return opportunities.filter(opp => {
       // Filter by opportunity name (search)
-      const matchesSearch = filters.opportunityName === 'All Opportunities' || 
+      const matchesSearch = filters.opportunityName === 'All Leads' || 
         !filters.opportunityName ||
         (opp.opportunity_name && 
          opp.opportunity_name.toLowerCase().includes(filters.opportunityName.toLowerCase()));
@@ -70,7 +70,7 @@ const Opportunities = () => {
         (opp.status && opp.status === filters.status);
       
       // Filter by opportunity type (using opportunity_name as type)
-      const matchesType = filters.type === 'All Opportunities' || 
+      const matchesType = filters.type === 'All Leads' || 
         (opp.opportunity_name && opp.opportunity_name === filters.type);
       
       return matchesSearch && matchesStatus && matchesType;
@@ -80,18 +80,18 @@ const Opportunities = () => {
   // Clear all filters
   const clearFilters = () => {
     setFilters({
-      opportunityName: 'All Opportunities',
+      opportunityName: 'All Leads',
       status: 'All Status',
       client: 'All Clients',
       closeDate: 'All Dates',
-      type: 'All Opportunities'
+      type: 'All Leads'
     });
   };
 
   // Handle download sample template
   const handleDownloadTemplate = () => {
     const template = [
-      ['Opportunity ID', 'Opportunity Name', 'Client', 'Status', 'Amount', 'Close Date', 'Created By'],
+      ['Opportunity ID', 'Opportunity Name', 'Client', 'Status', 'Amount', 'End Date', 'Created By'],
       // Add more sample data if needed
     ];
     
@@ -214,8 +214,8 @@ const Opportunities = () => {
           .filter(Boolean) // Remove any undefined/null values
       )];
       
-      // Keep 'All Opportunities' as first option, then add the unique names
-      setOpportunityTypeOptions(['All Opportunities', ...uniqueOpportunityNames]);
+      // Keep 'All Leads' as first option, then add the unique names
+      setOpportunityTypeOptions(['All Leads', ...uniqueOpportunityNames]);
     }
   }, [opportunities]);
 
@@ -349,7 +349,7 @@ const Opportunities = () => {
   const columns = [
     {
       key: 'opportunity_name',
-      header: 'Opportunity Name',
+      header: 'Name',
       headerClassName: 'text-[18px] font-medium',
       render: (value) => (
         <span className="font-medium text-sm">
@@ -405,7 +405,7 @@ const Opportunities = () => {
     },
     {
       key: 'close_date',
-      header: 'Close Date',
+      header: 'End Date',
       headerClassName: 'text-[18px] font-medium',
       render: (value) => value ? new Date(value).toLocaleDateString() : 'N/A'
     },
@@ -500,10 +500,10 @@ const Opportunities = () => {
       <div className="flex justify-between items-center">
         <div>
           <div className="flex items-baseline space-x-2">
-            <h1 className="text-2xl font-bold text-slate-900">Opportunities</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Leads</h1>
             <span className="text-sm text-slate-500">({filteredOpportunities.length} records)</span>
           </div>
-          <p className="text-sm text-slate-600 mt-0.5">Manage sales opportunities and track progress</p>
+          <p className="text-sm text-slate-600 mt-0.5">Manage sales Leads and track progress</p>
         </div>
         <div className="flex items-center space-x-4">
           <div className="relative flex items-center space-x-2">
@@ -512,7 +512,7 @@ const Opportunities = () => {
               type="search"
               placeholder="Search..."
               className="pl-9 w-[180px] text-sm"
-              value={filters.opportunityName === 'All Opportunities' ? '' : filters.opportunityName}
+              value={filters.opportunityName === 'All Leads' ? '' : filters.opportunityName}
               onChange={(e) => handleFilterChange('opportunityName', e.target.value)}
             />
             
@@ -539,7 +539,7 @@ const Opportunities = () => {
               onValueChange={(value) => handleFilterChange('type', value)}
             >
               <SelectTrigger className="w-[150px] h-9 text-sm">
-                <SelectValue placeholder="All Opportunities" />
+                <SelectValue placeholder="All Leads" />
               </SelectTrigger>
               <SelectContent className="max-h-[300px] overflow-y-auto">
                 {opportunityTypeOptions.map((type) => (
@@ -627,7 +627,7 @@ const Opportunities = () => {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {showOnlySOW ? 'SOW Details' : isRFPView ? 'RFP Details' : editingOpportunity ? 'Edit Opportunity' : 'Add New Opportunity'}
+              {showOnlySOW ? 'SOW Details' : isRFPView ? 'RFP Details' : editingOpportunity ? 'Edit Lead' : 'Add New Lead'}
             </DialogTitle>
           </DialogHeader>
           <OpportunityFormTabbed 
