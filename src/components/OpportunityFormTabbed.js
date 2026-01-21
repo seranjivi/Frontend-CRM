@@ -7,7 +7,7 @@ import { getUsers } from '../services/userService';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Search, ChevronDown, Loader2 } from 'lucide-react';
+import { Search, ChevronDown, Loader2, Plus, Trash2, Calendar } from 'lucide-react';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Switch } from './ui/switch';
 import { Slider } from './ui/slider';
 import { toast } from 'sonner';
-import { Plus, Trash2 } from 'lucide-react';
+import { format } from "date-fns";
 import MultiFileUpload from './attachments/MultiFileUpload';
 import DateField from './DateField';
 import PropTypes from 'prop-types';
@@ -44,6 +44,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   const [formErrors, setFormErrors] = useState({});
   const [nextStepInput, setNextStepInput] = useState('');
   const [isSubmittingNextStep, setIsSubmittingNextStep] = useState(false);
+  const [newQaQuestion, setNewQaQuestion] = useState('');
   const [clients, setClients] = useState([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
 
@@ -71,7 +72,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   ];
   const RFP_STATUSES = ['Draft', 'Submitted', 'Won', 'Lost', 'In Progress'];
   const SOW_STATUSES = ['Draft', 'Submitted', 'Won', 'Lost', 'In Progress'];
-  
+
   const TRIAGED_OPTIONS = [
     { value: 'Proceed', label: 'Proceed (Go)' },
     { value: 'Hold', label: 'Hold (Lead)' },
@@ -93,7 +94,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     updateOpportunityData('pipelineStatus', status);
     const currentWinProbability = formData.opportunity.winProbability;
     const autoWinProbability = getWinProbability(status);
-    
+
     const isAutoValue = Object.values({
       'Proposal Work-in-Progress': 20,
       'Proposal Review': 40,
@@ -101,7 +102,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
       'Won': 100,
       'Lost': 0
     }).includes(currentWinProbability);
-    
+
     if (isAutoValue || currentWinProbability === undefined) {
       updateOpportunityData('winProbability', autoWinProbability);
     }
@@ -163,21 +164,21 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         const response = await getUsers();
         // Log the raw response for debugging
         console.log('Users API Response:', response);
-        
+
         // Map the response to ensure we have the correct structure
-        const formattedUsers = Array.isArray(response) 
-          ? response 
-          : Array.isArray(response?.data) 
-            ? response.data 
+        const formattedUsers = Array.isArray(response)
+          ? response
+          : Array.isArray(response?.data)
+            ? response.data
             : [];
-            
+
         console.log('Formatted Users:', formattedUsers);
         console.log('Current formData.opportunity:', {
           sales_owner: formData.opportunity.sales_owner,
           technical_poc: formData.opportunity.technical_poc,
           presales_poc: formData.opportunity.presales_poc
         });
-        
+
         // Log if we can find the selected users
         if (formData.opportunity.sales_owner) {
           const salesOwner = formattedUsers.find(u => u.id === formData.opportunity.sales_owner || u._id === formData.opportunity.sales_owner);
@@ -191,7 +192,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           const presalesPOC = formattedUsers.find(u => u.id === formData.opportunity.presales_poc || u._id === formData.opportunity.presales_poc);
           console.log('Found presales POC:', presalesPOC);
         }
-        
+
         setUsers(formattedUsers);
       } catch (error) {
         console.error('Error fetching users:', error);
@@ -208,7 +209,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   useEffect(() => {
     if (opportunity) {
       console.log('Raw opportunity data:', opportunity); // Debug log
-      
+
       setFormData({
         opportunity: {
           ...defaultFormData.opportunity,
@@ -217,11 +218,11 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           client_name: opportunity.client_name || opportunity.opportunity?.client_name || 'Unknown Client',
           closeDate: opportunity.close_date || opportunity.opportunity?.closeDate || '',
           // Handle both snake_case and camelCase date formats, and ensure proper date string format
-          start_date: opportunity.start_date || 
-                    opportunity.opportunity?.start_date || 
-                    (opportunity.opportunity?.startDate ? 
-                      new Date(opportunity.opportunity.startDate).toISOString().split('T')[0] : 
-                      ''),
+          start_date: opportunity.start_date ||
+            opportunity.opportunity?.start_date ||
+            (opportunity.opportunity?.startDate ?
+              new Date(opportunity.opportunity.startDate).toISOString().split('T')[0] :
+              ''),
           sales_owner: opportunity.sales_owner || opportunity.opportunity?.sales_owner || '',
           technical_poc: opportunity.technical_poc || opportunity.opportunity?.technical_poc || '',
           presales_poc: opportunity.presales_poc || opportunity.opportunity?.presales_poc || '',
@@ -232,11 +233,11 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           triaged: opportunity.triaged_status || opportunity.opportunity?.triaged || 'Hold',
           pipelineStatus: opportunity.pipeline_status || opportunity.opportunity?.pipelineStatus || 'Proposal Work-in-Progress',
           winProbability: opportunity.win_probability || opportunity.opportunity?.winProbability || 20,
-          nextSteps: Array.isArray(opportunity.nextSteps) 
-            ? opportunity.nextSteps 
-            : (Array.isArray(opportunity.opportunity?.nextSteps) 
-                ? opportunity.opportunity.nextSteps 
-                : []),
+          nextSteps: Array.isArray(opportunity.nextSteps)
+            ? opportunity.nextSteps
+            : (Array.isArray(opportunity.opportunity?.nextSteps)
+              ? opportunity.opportunity.nextSteps
+              : []),
           createdBy: opportunity.created_by || opportunity.opportunity?.createdBy || 'System',
           description: opportunity.description || opportunity.opportunity?.description || '',
           id: opportunity.id || opportunity.opportunity?.id || '',
@@ -253,11 +254,11 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           bidManager: opportunity.bid_manager || opportunity.rfpDetails?.bidManager || '',
           submissionMode: opportunity.submission_mode || opportunity.rfpDetails?.submissionMode || '',
           portalUrl: opportunity.portal_url || opportunity.rfpDetails?.portalUrl || '',
-          qaLogs: Array.isArray(opportunity.qa_logs) 
-            ? opportunity.qa_logs 
-            : (Array.isArray(opportunity.rfpDetails?.qaLogs) 
-                ? opportunity.rfpDetails.qaLogs 
-                : [])
+          qaLogs: Array.isArray(opportunity.qa_logs)
+            ? opportunity.qa_logs
+            : (Array.isArray(opportunity.rfpDetails?.qaLogs)
+              ? opportunity.rfpDetails.qaLogs
+              : [])
         },
         sowDetails: {
           ...defaultFormData.sowDetails,
@@ -271,14 +272,14 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           linkedProposalRef: opportunity.linked_proposal_ref || opportunity.sowDetails?.linkedProposalRef || '',
           scopeOverview: opportunity.scope_overview || opportunity.sowDetails?.scopeOverview || ''
         },
-        rfpDocuments: Array.isArray(opportunity.rfpDocuments) 
-          ? opportunity.rfpDocuments 
+        rfpDocuments: Array.isArray(opportunity.rfpDocuments)
+          ? opportunity.rfpDocuments
           : [],
-        sowDocuments: Array.isArray(opportunity.sowDocuments) 
-          ? opportunity.sowDocuments 
+        sowDocuments: Array.isArray(opportunity.sowDocuments)
+          ? opportunity.sowDocuments
           : []
       });
-      
+
       console.log('Form data after setting:', {
         ...formData,
         opportunity: {
@@ -322,7 +323,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
 
   const validateForm = () => {
     const errors = {};
-    
+
     // Required fields validation
     if (!formData.opportunity.opportunity_name?.trim()) {
       errors.opportunity_name = 'Name is required';
@@ -341,13 +342,13 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     if (formData.opportunity.triaged !== 'Drop' && !formData.opportunity.pipelineStatus) {
       errors.pipelineStatus = 'Pipeline status is required';
     }
-    
+
     return errors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     try {
       // Handle SOW creation if in SOW tab
       if (activeTab === 'sow') {
@@ -359,7 +360,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           // 1. First, get the RFP for this opportunity
           const opportunityId = opportunity?.id || opportunity?.opportunity?.id;
           const rfpResponse = await rfpService.getRFPsByOpportunityId(opportunityId);
-          
+
           if (!rfpResponse.data || !rfpResponse.data.id) {
             throw new Error('No RFP found for this opportunity');
           }
@@ -387,13 +388,13 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
               'Authorization': `Bearer ${authToken}`
             }
           });
-          
+
           toast.success('SOW created successfully!');
           if (onSuccess) onSuccess(result);
           if (onClose) onClose();
           // Redirect to /sows page after successful creation
           window.location.href = '/sows';
-          
+
         } catch (error) {
           console.error('Error in SOW creation flow:', error);
           toast.error(error.response?.data?.message || 'Failed to create SOW');
@@ -422,7 +423,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         if (onSuccess && typeof onSuccess === 'function') {
           onSuccess(result);
         }
-        
+
         if (onClose) onClose();
         return;
       }
@@ -430,7 +431,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
       // Original opportunity creation/update logic
       const isEdit = !!opportunity?.id || !!opportunity?.opportunity?.id;
       const opportunityId = opportunity?.id || opportunity?.opportunity?.id;
-      
+
       // Check for existing opportunity with the same name for new records
       if (!isEdit) {
         try {
@@ -438,7 +439,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           const duplicate = existingOpportunities.data.some(
             opp => opp.opportunity_name.toLowerCase() === formData.opportunity.opportunity_name.toLowerCase()
           );
-          
+
           if (duplicate) {
             toast.error('An opportunity with this name already exists');
             return;
@@ -460,7 +461,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         // Ensure we have a valid date string
         closeDate = closeDate.split('T')[0];
       }
-      
+
       // Format amount - convert empty string to null
       const amount = formData.opportunity.amount === '' ? null : parseFloat(formData.opportunity.amount);
 
@@ -482,12 +483,12 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         close_date: closeDate,
         amount: amount,
         amount_currency: formData.opportunity.currency || 'USD',
-        
+
         // Optional fields with defaults
         lead_source: formData.opportunity.leadSource || null,
         opportunity_type: formData.opportunity.type || 'New Business',
-        triaged_status: formData.opportunity.triaged === 'Proceed' ? 'Proceed' : 
-                       (formData.opportunity.triaged === 'Drop' ? 'Drop' : 'Hold'),
+        triaged_status: formData.opportunity.triaged === 'Proceed' ? 'Proceed' :
+          (formData.opportunity.triaged === 'Drop' ? 'Drop' : 'Hold'),
         pipeline_status: formData.opportunity.pipelineStatus || 'Proposal Work-in-Progress',
         win_probability: parseInt(formData.opportunity.winProbability) || 20,
         user_name: formData.opportunity.createdBy || 'System',
@@ -521,13 +522,13 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
       if (onSuccess && typeof onSuccess === 'function') {
         onSuccess(result.data);
       }
-      
+
       if (onClose) onClose();
-      
+
     } catch (error) {
       console.error('Error saving opportunity:', error);
       let errorMessage = 'Failed to save opportunity';
-      
+
       if (error.response) {
         console.error('Error response data:', error.response.data);
         if (Array.isArray(error.response.data?.detail)) {
@@ -535,8 +536,8 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         } else if (error.response.data?.message) {
           errorMessage = error.response.data.message;
         } else if (error.response.data?.detail) {
-          errorMessage = typeof error.response.data.detail === 'string' 
-            ? error.response.data.detail 
+          errorMessage = typeof error.response.data.detail === 'string'
+            ? error.response.data.detail
             : JSON.stringify(error.response.data.detail);
         }
         console.error('Status:', error.response.status);
@@ -547,7 +548,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         console.error('Error:', error.message);
         errorMessage = error.message;
       }
-      
+
       toast.error(errorMessage);
     }
   };
@@ -576,13 +577,13 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
 
   const addNextStep = async () => {
     if (!nextStepInput.trim()) return;
-    
+
     setIsSubmittingNextStep(true);
     try {
       // Get the current user from localStorage
       const authUser = JSON.parse(localStorage.getItem('user') || '{}');
       const userName = authUser?.full_name || authUser?.name || authUser?.email || 'User';
-      
+
       const newStep = {
         id: Date.now().toString(),
         description: nextStepInput.trim(),
@@ -590,7 +591,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         createdAt: new Date().toISOString(),
         userName: userName
       };
-      
+
       updateOpportunityData('nextSteps', [...formData.opportunity.nextSteps, newStep]);
       setNextStepInput('');
     } catch (error) {
@@ -668,20 +669,20 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
       )}
       <Tabs value={activeTab} onValueChange={!showOnlyRFP && !showOnlyDetails && !showOnlySOW ? setActiveTab : undefined} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger 
-            value="details" 
+          <TabsTrigger
+            value="details"
             disabled={showOnlyRFP || showOnlySOW}
           >
             Details
           </TabsTrigger>
-          <TabsTrigger 
+          <TabsTrigger
             value="rfp"
             disabled={showOnlyDetails || showOnlySOW}
           >
             RFP Details
           </TabsTrigger>
-          <TabsTrigger 
-            value="sow" 
+          <TabsTrigger
+            value="sow"
             disabled={showOnlyRFP || showOnlyDetails}
           >
             SOW Details
@@ -882,7 +883,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       />
                     </div>
                   )}
-    <div>
+                  <div>
                     <Label htmlFor="sales_owner">Sales Owner</Label>
                     <Select
                       value={formData.opportunity.sales_owner}
@@ -1106,7 +1107,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                             }
                           }}
                         />
-                        <Button 
+                        <Button
                           type="button"
                           onClick={addNextStep}
                           disabled={!nextStepInput.trim() || isSubmittingNextStep}
@@ -1122,8 +1123,8 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                         .slice()
                         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
                         .map((step) => (
-                          <div 
-                            key={step.id} 
+                          <div
+                            key={step.id}
                             className="p-4 border rounded-lg bg-white shadow-sm hover:shadow transition-shadow"
                           >
                             <div className="flex justify-between items-start">
@@ -1141,7 +1142,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                             </div>
                           </div>
                         ))}
-                      
+
                       {formData.opportunity.nextSteps.length === 0 && (
                         <div className="text-center py-4 text-muted-foreground text-sm">
                           No next steps added yet. Add one above.
@@ -1162,14 +1163,20 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* RFP Title */}
-                  <div className="md:col-span-2">
-                    <Label htmlFor="rfpTitle">RFP Title <span className="text-red-600">*</span></Label>
-                    <Input
-                      id="rfpTitle"
-                      value={formData.rfpDetails.rfpTitle}
-                      onChange={(e) => updateRfpDetails('rfpTitle', e.target.value)}
-                    />
+                  {/* RFP Type */}
+                  <div>
+                    <Label htmlFor="rfpType">Type</Label>
+                    <Select
+                      value={formData.rfpDetails.rfpType || ''}
+                      onValueChange={(value) => updateRfpDetails('rfpType', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="RFP">RFP</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* RFP Status */}
@@ -1191,32 +1198,87 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {/* Submission Deadline */}
+                  {/* RFP Status */}
                   <div>
-                    <Label>Submission Deadline</Label>
-                    <DateField
-                      selected={formData.rfpDetails.submissionDeadline ? new Date(formData.rfpDetails.submissionDeadline) : null}
-                      onChange={(date) => updateRfpDetails('submissionDeadline', date)}
-                      minDate={new Date()}
-                      placeholderText="Select deadline"
-                      showTimeSelect
-                      timeFormat="HH:mm"
-                      timeIntervals={15}
-                      dateFormat="MMMM d, yyyy h:mm aa"
+                    <Label htmlFor="rfbDescription">RFB Description</Label>
+                    <Textarea
+                      id="rfbDescription"
+                      value={formData.rfpDetails.rfbDescription || ''}
+                      onChange={(e) => updateRfpDetails('rfbDescription', e.target.value)}
+                      placeholder="Enter RFB description..."
+                      className="min-h-[100px]"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="solutionDescription">Solution Description</Label>
+                    <Textarea
+                      id="solutionDescription"
+                      value={formData.rfpDetails.solutionDescription || ''}
+                      onChange={(e) => updateRfpDetails('solutionDescription', e.target.value)}
+                      placeholder="Enter solution description..."
+                      className="min-h-[100px]"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="submissionDeadline">Submission Deadline</Label>
+                    <Input
+                      id="submissionDeadline"
+                      type="date"
+                      value={
+                        formData.rfpDetails.submissionDeadline
+                          ? formatDateForInput(formData.rfpDetails.submissionDeadline)
+                          : ''
+                      }
+                      onChange={(e) =>
+                        updateRfpDetails('submissionDeadline', e.target.value)
+                      }
+                      min={new Date().toISOString().split('T')[0]}
                     />
                   </div>
 
-                  {/* Bid Manager */}
                   <div>
                     <Label htmlFor="bidManager">Response Owner</Label>
-                    <Input
-                      id="bidManager"
+                    <Select
                       value={formData.rfpDetails.bidManager}
-                      onChange={(e) => updateRfpDetails('bidManager', e.target.value)}
-                    />
+                      onValueChange={(value) => {
+                        console.log('New value selected:', value);
+                        updateRfpDetails('bidManager', value);
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select response owner">
+                          {formData.rfpDetails.bidManager ?
+                            users.find(u => String(u.id || u._id) === String(formData.rfpDetails.bidManager))?.full_name ||
+                            'Unknown User'
+                            : null
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {isLoadingUsers ? (
+                          <div className="p-2 text-center">
+                            <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Loading users...
+                            </p>
+                          </div>
+                        ) : users.length > 0 ? (
+                          users.map((user) => {
+                            const userId = user.id || user._id;
+                            return (
+                              <SelectItem key={userId} value={String(userId)}>
+                                {user.full_name || user.name || user.email || `User ${userId}`}
+                              </SelectItem>
+                            );
+                          })
+                        ) : (
+                          <div className="p-2 text-center text-sm text-muted-foreground">
+                            No users found
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
-
                   {/* Submission Mode */}
                   <div>
                     <Label htmlFor="submissionMode">Submission Mode</Label>
@@ -1227,7 +1289,6 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       placeholder="e.g., Email, Portal, etc."
                     />
                   </div>
-
                   {/* Portal URL */}
                   <div>
                     <Label htmlFor="portalUrl">Portal URL</Label>
@@ -1240,10 +1301,79 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                     />
                   </div>
 
+                  {/* Submission Deadline and Response Owner in the same row */}
+                  {/* Row 2: Submission Deadline + Response Owner */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+
+                    </div>
+
+
+                  </div>
+
+
+
+
+
+
                   {/* Q&A Logs */}
-                  <div className="md:col-span-2">
-                    <Label>Q&A Log</Label>
-                    <div className="space-y-2">
+                  <div className="md:col-span-2 -mt-2">
+                    <div className="mb-2">
+                      <Label>Q&A Log</Label>
+                      <div className="flex flex-col space-y-2 w-full">
+                        <div className="flex flex-col space-y-2 w-full">
+                          <Textarea
+                            value={newQaQuestion}
+                            onChange={(e) => setNewQaQuestion(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey && newQaQuestion.trim()) {
+                                e.preventDefault();
+                                const newQa = {
+                                  id: Date.now().toString(),
+                                  question: newQaQuestion.trim(),
+                                  askedBy: 'current_user',
+                                  askedAt: new Date().toISOString(),
+                                  questionSubmissionDate: new Date().toISOString(),
+                                  responseSubmissionDate: '',
+                                  answer: ''
+                                };
+                                updateRfpDetails('qaLogs', [...(formData.rfpDetails.qaLogs || []), newQa]);
+                                setNewQaQuestion('');
+                              }
+                            }}
+                            placeholder="Type your question here..."
+                            className="min-h-[80px] w-full"
+                          />
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                if (newQaQuestion.trim()) {
+                                  const newQa = {
+                                    id: Date.now().toString(),
+                                    question: newQaQuestion.trim(),
+                                    askedBy: 'current_user',
+                                    askedAt: new Date().toISOString(),
+                                    questionSubmissionDate: new Date().toISOString(),
+                                    responseSubmissionDate: '',
+                                    answer: ''
+                                  };
+                                  updateRfpDetails('qaLogs', [...(formData.rfpDetails.qaLogs || []), newQa]);
+                                  setNewQaQuestion('');
+                                }
+                              }}
+                              disabled={!newQaQuestion.trim()}
+                              className="w-fit"
+                            >
+                              <Plus className="mr-1 h-4 w-4" /> Add Q&A
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
                       {formData.rfpDetails.qaLogs?.map((qa, index) => (
                         <div key={qa.id || index} className="p-4 border rounded-lg">
                           <div className="flex justify-between items-start">
@@ -1252,7 +1382,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                               {qa.answer && (
                                 <div className="text-sm text-muted-foreground">
                                   <span className="font-medium">Answer:</span> {qa.answer}
-                                </div> 
+                                </div>
                               )}
                             </div>
                             <Button
@@ -1268,18 +1398,52 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-                          <div className="text-xs text-muted-foreground mt-2">
-                            Asked by {qa.askedBy} on {new Date(qa.askedAt).toLocaleString()}
-                            {qa.answeredBy && (
-                              <>
-                                <br />
-                                Answered by {qa.answeredBy} on {new Date(qa.answeredAt).toLocaleString()}
-                              </>
-                            )}
+                          <div className="grid grid-cols-2 gap-4 mt-3 text-xs text-muted-foreground">
+                            <div>
+                              <Label htmlFor={`questionSubmissionDate-${index}`}>Question Submission</Label>
+                              <Input
+                                id={`questionSubmissionDate-${index}`}
+                                type="date"
+                                value={qa.questionSubmissionDate 
+                                  ? formatDateForInput(qa.questionSubmissionDate) 
+                                  : ''}
+                                onChange={(e) => {
+                                  const updatedQaLogs = [...formData.rfpDetails.qaLogs];
+                                  updatedQaLogs[index] = {
+                                    ...qa,
+                                    questionSubmissionDate: e.target.value,
+                                    askedAt: e.target.value || new Date().toISOString()
+                                  };
+                                  updateRfpDetails('qaLogs', updatedQaLogs);
+                                }}
+                                min={new Date().toISOString().split('T')[0]}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`responseSubmissionDate-${index}`}>Response Submission</Label>
+                              <Input
+                                id={`responseSubmissionDate-${index}`}
+                                type="date"
+                                value={qa.responseSubmissionDate 
+                                  ? formatDateForInput(qa.responseSubmissionDate) 
+                                  : ''}
+                                onChange={(e) => {
+                                  const updatedQaLogs = [...formData.rfpDetails.qaLogs];
+                                  updatedQaLogs[index] = {
+                                    ...qa,
+                                    responseSubmissionDate: e.target.value,
+                                    answeredBy: 'current_user',
+                                    answeredAt: new Date().toISOString()
+                                  };
+                                  updateRfpDetails('qaLogs', updatedQaLogs);
+                                }}
+                                min={new Date().toISOString().split('T')[0]}
+                              />
+                            </div>
                           </div>
                         </div>
                       ))}
-                      <Button
+                      {/* <Button
                         type="button"
                         variant="outline"
                         size="sm"
@@ -1289,13 +1453,14 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                             id: Date.now().toString(),
                             question: '',
                             askedBy: 'current_user',
-                            askedAt: new Date().toISOString()
+                            askedAt: new Date().toISOString(),
+                            questionSubmissionDate: new Date().toISOString(),
+                            responseSubmissionDate: ''
                           };
                           updateRfpDetails('qaLogs', [...(formData.rfpDetails.qaLogs || []), newQa]);
                         }}
                       >
-                        <Plus className="mr-2 h-4 w-4" /> Add Q&A
-                      </Button>
+                      </Button> */}
                     </div>
                   </div>
                 </div>
@@ -1449,19 +1614,19 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {opportunity ? 'Updating...' : 'Creating...'}
-                  </>
-                ) : (
-                  <>
-                    {activeTab === 'sow' ? 'Add SOW' : 
-                     activeTab === 'rfp' ? 'Add RFB' : 
-                     (opportunity ? 'Update Opportunity' : 'Create Opportunity')}
-                  </>
-                )}
+            <Button type="submit" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {opportunity ? 'Updating...' : 'Creating...'}
+                </>
+              ) : (
+                <>
+                  {activeTab === 'sow' ? 'Add SOW' :
+                    activeTab === 'rfp' ? 'Add RFB' :
+                      (opportunity ? 'Update Opportunity' : 'Create Opportunity')}
+                </>
+              )}
             </Button>
           </div>
         </form>
