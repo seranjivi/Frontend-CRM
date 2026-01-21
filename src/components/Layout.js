@@ -54,7 +54,7 @@ const Layout = ({ children }) => {
       permission: 'opportunities',
       subItems: [
         { name: 'All Leads', href: '/opportunities' },
-        { name: 'RFP Details', href: '/rfp-details' },
+        { name: 'Opportunity-RFP', href: '/rfp-details' },
         { name: 'SOW Details', href: '/sows', icon: FileText },
         { name: 'Opportunity Management', href: '/opportunity-management', icon: BarChart }
       ]
