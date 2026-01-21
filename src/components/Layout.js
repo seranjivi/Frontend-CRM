@@ -48,12 +48,12 @@ const Layout = ({ children }) => {
     { name: 'Sales Activity', href: '/sales-activity', icon: Activity, permission: 'sales_activity' },
     // { name: 'Leads', href: '/leads', icon: Target, permission: 'leads' },
     { 
-      name: 'Opportunities', 
+      name: 'Leads', 
       href: '/opportunities', 
       icon: TrendingUp,
       permission: 'opportunities',
       subItems: [
-        { name: 'All Opportunities', href: '/opportunities' },
+        { name: 'All Leads', href: '/opportunities' },
         { name: 'RFP Details', href: '/rfp-details' },
         { name: 'SOW Details', href: '/sows', icon: FileText },
         { name: 'Opportunity Management', href: '/opportunity-management', icon: BarChart }

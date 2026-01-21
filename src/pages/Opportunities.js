@@ -610,7 +610,7 @@ const Opportunities = () => {
             className="bg-[#0A2A43] hover:bg-[#0A2A43]/90 h-9 text-sm"
           >
             <Plus className="h-3.5 w-3.5 mr-1.5" />
-            Add Opportunity
+            Add Lead
           </Button>
         </div>
       </div>

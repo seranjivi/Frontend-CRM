@@ -334,12 +334,10 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     if (!formData.opportunity.closeDate) {
       errors.closeDate = 'End date is required';
     }
-    if (formData.opportunity.amount === '' || formData.opportunity.amount === null || formData.opportunity.amount === undefined) {
-      errors.amount = 'Amount is required';
-    } else if (parseFloat(formData.opportunity.amount) <= 0) {
+    if (formData.opportunity.amount && parseFloat(formData.opportunity.amount) <= 0) {
       errors.amount = 'Amount must be greater than 0';
     }
-    if (formData.opportunity.triaged !== 'Drop' && !formData.opportunity.pipelineStatus) {
+    if (formData.opportunity.triaged !== 'Drop' && formData.opportunity.triaged !== 'Hold' && !formData.opportunity.pipelineStatus) {
       errors.pipelineStatus = 'Pipeline status is required';
     }
 
@@ -509,14 +507,14 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         // For update, make sure we're using the correct ID
         const updateId = opportunityId || formData.opportunity.id;
         if (!updateId) {
-          throw new Error('No opportunity ID provided for update');
+          throw new Error('No Lead ID provided for update');
         }
         result = await opportunityService.updateOpportunity(updateId, opportunityData);
-        toast.success('Opportunity updated successfully!');
+        toast.success('Lead updated successfully!');
       } else {
         // For create
         result = await opportunityService.createOpportunity(opportunityData);
-        toast.success('Opportunity created successfully!');
+        toast.success('Lead created successfully!');
       }
 
       if (onSuccess && typeof onSuccess === 'function') {
@@ -740,9 +738,8 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <div>
-                      <Label>Start Date <span className="text-red-600">*</span></Label>
+                      <Label>Start Date</Label>
                       <input
-                        required
                         type="date"
                         value={formatDateForInput(formData.opportunity.start_date)}
                         onChange={(e) => {
@@ -756,7 +753,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   </div>
                   <div>
                     <div>
-                      <Label>End Date <span className="text-red-600">*</span></Label>
+                      <Label>End Date</Label>
                       {formErrors.closeDate && (
                         <p className="text-sm text-red-600 mb-1">{formErrors.closeDate}</p>
                       )}
@@ -775,18 +772,14 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                           }
                         }}
                         min={formatDateForInput(new Date())}
-                        className={`w-full p-2 border rounded ${formErrors.closeDate ? 'border-red-500' : 'border-gray-300'}`}
-                        required
+                        className="w-full p-2 border rounded border-gray-300"
                       />
                     </div>
                   </div>
 
                   <div>
                     <div>
-                      <Label htmlFor="amount">Amount <span className="text-red-600">*</span></Label>
-                      {formErrors.amount && (
-                        <p className="text-sm text-red-600 mb-1">{formErrors.amount}</p>
-                      )}
+                      <Label htmlFor="amount">Amount</Label>
                       <div className="flex">
                         <Select
                           value={formData.opportunity.currency}
@@ -811,7 +804,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                           onChange={(e) => updateOpportunityData('amount', e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
                           placeholder="0.00"
                           className="rounded-l-none"
-                          required
+                          
                         />
                       </div>
                     </div>
@@ -1030,7 +1023,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   </div>
 
                   {/* Pipeline Status - Only show if not 'Drop' */}
-                  {formData.opportunity.triaged !== 'Drop' && (
+                  {(formData.opportunity.triaged !== 'Drop' && formData.opportunity.triaged !== 'Hold') && (
                     <div>
                       <Label htmlFor="pipelineStatus">Pipeline Status <span className="text-red-600">*</span></Label>
                       {formErrors.pipelineStatus && (
@@ -1060,7 +1053,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   )}
 
                   {/* Win Probability - Only show if not 'Drop' */}
-                  {formData.opportunity.triaged !== 'Drop' && (
+                  {(formData.opportunity.triaged !== 'Drop' && formData.opportunity.triaged !== 'Hold') && (
                     <div className="md:col-span-2">
                       <div className="flex justify-between items-center mb-2">
                         <Label htmlFor="winProbability">
@@ -1624,7 +1617,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                 <>
                   {activeTab === 'sow' ? 'Add SOW' :
                     activeTab === 'rfp' ? 'Add RFB' :
-                      (opportunity ? 'Update Opportunity' : 'Create Opportunity')}
+                      (opportunity ? 'Update' : 'Create')}
                 </>
               )}
             </Button>
