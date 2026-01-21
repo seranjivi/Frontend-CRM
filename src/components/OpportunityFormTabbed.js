@@ -701,7 +701,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       id="opportunity_name"
                       value={formData.opportunity.opportunity_name}
                       onChange={(e) => updateOpportunityData('opportunity_name', e.target.value)}
-                      placeholder="Enter opportunity name"
+                      placeholder="Enter Lead name"
                       className={`w-full ${formErrors.opportunity_name ? 'border-red-500' : ''}`}
                     />
                     {formErrors.opportunity_name && (
