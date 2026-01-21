@@ -11,6 +11,7 @@ import CountryDropdown from './CountryDropdown';
 import { Plus, Trash2, Building2, X, ChevronDown } from 'lucide-react';
 import { getUsers } from '../services/userService';
 import clientService from '../services/clientService';
+import masterDataService from '../services/masterDataService';
 
 // Common country codes with their respective dial codes
 const countryCodes = [
@@ -34,7 +35,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
     contact_email: '',
     website: '',
     industry: '',
-    customer_type: '',
+    customer_type: 'Partner',
     gst_tax_id: '',
     addresses: [{ address_line1: '', country: '', region: '', is_primary: true }],
     account_owner: '',
@@ -53,23 +54,35 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
   const [errors, setErrors] = useState({});
   const [selectedCountryIds, setSelectedCountryIds] = useState({});
   const [users, setUsers] = useState([]);
+  const [regions, setRegions] = useState([]);
+  const [selectedRegionId, setSelectedRegionId] = useState(null);
+  const [countries, setCountries] = useState([]);
 
-  // Fetch users for account owner dropdown
+  // Fetch users and regions on component mount
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchInitialData = async () => {
       try {
-        const response = await getUsers();
-        // Extract users array from response.data
-        const usersData = Array.isArray(response?.data) ? response.data : [];
+        // Fetch users
+        const usersResponse = await getUsers();
+        const usersData = Array.isArray(usersResponse?.data) ? usersResponse.data : [];
         setUsers(usersData);
+
+        // Fetch regions with countries
+        const response = await masterDataService.getRegionsWithCountries();
+        console.log('Regions data response:', response); // Debug log
+        // Check if response has a data property and it's an array
+        const regionsData = response?.data || [];
+        console.log('Processed regions data:', regionsData); // Debug log
+        setRegions(regionsData);
       } catch (error) {
-        console.error('Error fetching users:', error);
-        toast.error('Failed to load users');
-        setUsers([]); // Ensure users is always an array even on error
+        console.error('Error fetching initial data:', error);
+        toast.error('Failed to load required data');
+        setUsers([]);
+        setRegions([]);
       }
     };
 
-    fetchUsers();
+    fetchInitialData();
   }, []);
 
   // Debug effect to log formData.industry and client prop
@@ -85,7 +98,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
         contact_email: client.contact_email || '',
         website: client.website || '',
         industry: client.industry || '',
-        customer_type: client.customer_type || 'Direct Customer',
+        customer_type: client.customer_type || 'Partner',
         gst_tax_id: client.gst_tax_id || '',
         addresses: client.addresses && client.addresses.length > 0
           ? client.addresses
@@ -161,17 +174,49 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
     setFormData(prev => ({ ...prev, contact_persons: updatedContacts }));
   };
  
-  const handleCountryChange = (index, countryName, countryId) => {
-    // Update the selected country ID
-    setSelectedCountryIds(prev => ({
-      ...prev,
-      [index]: countryId
-    }));
+  const handleRegionChange = async (index, regionId) => {
+    console.log('handleRegionChange called with regionId:', regionId);
+    const region = regions.find(r => r.id === Number(regionId) || r.name === regionId);
     
-    // Update the form data with the country name
-    handleAddressChange(index, 'country', countryName);
-    // Clear region when country changes
-    handleAddressChange(index, 'region', '');
+    if (region) {
+      console.log('Selected region found:', region);
+      const updatedAddresses = [...formData.addresses];
+      updatedAddresses[index].region = region.name;
+      setFormData(prev => ({ ...prev, addresses: updatedAddresses }));
+      setSelectedRegionId(region.id);
+      
+      // Clear country when region changes
+      handleAddressChange(index, 'country', '');
+      
+      try {
+        console.log('Fetching countries for region ID:', region.id);
+        const countriesData = await masterDataService.getCountriesByRegionId(region.id);
+        console.log('Countries data received:', countriesData);
+        setCountries(countriesData);
+      } catch (error) {
+        console.error('Error in handleRegionChange:', error);
+        toast.error('Failed to load countries');
+        setCountries([]);
+      }
+    } else {
+      console.warn('No region found for ID:', regionId);
+    }
+  };
+
+  const handleCountryChange = (index, countryName, countryId) => {
+    console.log('Country selected:', countryName);
+    const selectedCountry = countries.find(c => c.name === countryName);
+    if (selectedCountry) {
+      console.log('Selected country:', selectedCountry);
+      // Update the selected country ID
+      setSelectedCountryIds(prev => ({
+        ...prev,
+        [index]: countryId
+      }));
+      
+      // Update the form data with the country name
+      handleAddressChange(index, 'country', countryName);
+    }
   };
 
   const handleAddressChange = (index, field, value) => {
@@ -267,7 +312,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
     }
    
     if (!formData.contact_email.trim()) {
-      newErrors.contact_email = 'Primary email is required';
+      newErrors.contact_email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contact_email)) {
       newErrors.contact_email = 'Please enter a valid email';
     }
@@ -277,25 +322,17 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
     }
    
     // Validate addresses
-    let hasAtLeastOneAddress = false;
+    let hasValidAddress = false;
     formData.addresses.forEach((address, index) => {
-      if (address.country) {
-        hasAtLeastOneAddress = true;
-      }
-     
-      if (!address.address_line1) {
-        newErrors[`address_line1_${index}`] = 'Address Line 1 is required';
-      }
-      if (!address.region) {
-        newErrors[`region_${index}`] = 'Region is required';
-      }
-      if (!address.country) {
-        newErrors[`country_${index}`] = 'Country is required';
+      if (address.address_line1 && address.address_line1.trim() !== '') {
+        hasValidAddress = true;
+      } else if (!newErrors.addresses) {
+        newErrors.addresses = 'Address Line 1 is required for at least one address';
       }
     });
    
-    if (!hasAtLeastOneAddress) {
-      newErrors.addresses = 'At least one address with country is required';
+    if (!hasValidAddress) {
+      newErrors.addresses = 'At least one address with Address Line 1 is required';
     }
    
     if (!formData.account_owner) {
@@ -479,9 +516,13 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
             <div className="space-y-2">
               <Label htmlFor="customer_type">Customer Type <span className="text-red-500">*</span></Label>
               <Select
-                key={`customer-type-${formData.customer_type || 'empty'}`}
-                defaultValue={formData.customer_type || 'Partner'}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, customer_type: value }))}
+                value={formData.customer_type}   // 
+                onValueChange={(value) => {
+                  setFormData(prev => ({ ...prev, customer_type: value }));
+                  if (errors.customer_type) {
+                    setErrors(prev => ({ ...prev, customer_type: '' }));
+                  }
+                }}
                 data-testid="client-customer-type-select"
               >
                 <SelectTrigger className={errors.customer_type ? 'border-red-500' : ''}>
@@ -493,6 +534,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                   <SelectItem value="Reseller">Reseller</SelectItem>
                 </SelectContent>
               </Select>
+
               {errors.customer_type && (
                 <p className="text-red-500 text-sm mt-1">{errors.customer_type}</p>
               )}
@@ -635,7 +677,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
               >
                 <div className="md:col-span-2">
                   <Label htmlFor={`address_line1_${index}`}>
-                    Address Line 1 {address.is_primary && <span className="text-blue-600 ml-2">(Primary)</span>}
+                    Address Line 1 <span className="text-red-500">*</span> {address.is_primary && <span className="text-blue-600 ml-2">(Primary)</span>}
                   </Label>
                   <Textarea
                     id={`address_line1_${index}`}
@@ -648,33 +690,106 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor={`country_${index}`}>Country <span className="text-red-500">*</span></Label>
-                  <CountryDropdown
-                    value={address.country}
-                    onChange={(country, countryId) => handleCountryChange(index, country, countryId)}
-                    required
-                    showRequiredIndicator={false}
-                    className={errors[`country_${index}`] ? 'border-red-500' : ''}
-                    data-testid={`country-${index}`}
-                  />
-                  {errors[`country_${index}`] && (
-                    <p className="text-red-500 text-sm mt-1">{errors[`country_${index}`]}</p>
+                  <Label htmlFor={`region_${index}`}>Region</Label>
+                  <Select
+                    value={address.region || ''}
+                    onValueChange={async (value) => {
+                      console.log('handleRegionChange called with regionId:', value);
+                      const region = regions.find(r => r.id === Number(value) || r.name === value);
+                      
+                      if (region) {
+                        console.log('Selected region found:', region);
+                        const updatedAddresses = [...formData.addresses];
+                        updatedAddresses[index].region = region.name;
+                        setFormData(prev => ({ ...prev, addresses: updatedAddresses }));
+                        setSelectedRegionId(region.id);
+                        
+                        // Clear country when region changes
+                        handleAddressChange(index, 'country', '');
+                        
+                        try {
+                            console.log('Fetching countries for region ID:', region.id);
+                            const response = await masterDataService.getCountriesByRegionId(region.id);
+                            console.log('API response:', response);
+                            
+                            // Extract countries from response.data
+                            const countriesData = response?.data || [];
+                            console.log('Countries data:', countriesData);
+                            
+                            // Map the data to the expected format
+                            const formattedCountries = countriesData.map(country => ({
+                              id: country.id,
+                              name: country.name,
+                              code: country.code,
+                              phone_code: country.phone_code
+                            }));
+                            
+                            console.log('Formatted countries:', formattedCountries);
+                            setCountries(formattedCountries);
+                        } catch (error) {
+                          console.error('Error in handleRegionChange:', error);
+                          toast.error('Failed to load countries');
+                          setCountries([]);
+                        }
+                      } else {
+                        console.warn('No region found for ID:', value);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className={errors[`region_${index}`] ? 'border-red-500' : ''}>
+                      <SelectValue>{address.region || 'Select a region...'}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {regions.map((region) => (
+                        <SelectItem 
+                          key={region.id} 
+                          value={region.id.toString()}
+                        >
+                          {region.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors[`region_${index}`] && (
+                    <p className="text-red-500 text-sm mt-1">{errors[`region_${index}`]}</p>
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor={`region_${index}`}>Region <span className="text-red-500">*</span></Label>
-                  <RegionDropdown
-                    value={address.region}
-                    onChange={(value) => handleAddressChange(index, 'region', value)}
-                    countryId={selectedCountryIds[index]}
-                    placeholder="Select region..."
-                    required={true}
-                    showRequiredIndicator={true}
-                    className={errors[`region_${index}`] ? 'border-red-500' : ''}
-                    data-testid={`region-${index}`}
-                  />
-                  {errors[`region_${index}`] && (
-                    <p className="text-red-500 text-sm mt-1">{errors[`region_${index}`]}</p>
+                  <Label htmlFor={`country_${index}`}>Country</Label>
+                  <Select
+  value={address.country || ''}
+  onValueChange={(value) => {
+    console.log('Country selected:', value);
+    const selectedCountry = countries.find(c => c.name === value);
+    if (selectedCountry) {
+      console.log('Selected country:', selectedCountry);
+      handleAddressChange(index, 'country', selectedCountry.name);
+    }
+  }}
+  disabled={!selectedRegionId}
+>
+  <SelectTrigger className={errors[`country_${index}`] ? 'border-red-500' : ''}>
+    <SelectValue>{address.country || (countries.length ? 'Select a country...' : 'Select a region first')}</SelectValue>
+  </SelectTrigger>
+  <SelectContent>
+    {countries.length > 0 ? (
+      countries.map((country) => (
+        <SelectItem 
+          key={country.id} 
+          value={country.name}
+        >
+          {country.name}
+        </SelectItem>
+      ))
+    ) : (
+      <div className="px-3 py-2 text-sm text-muted-foreground">
+        {selectedRegionId ? 'No countries found. Please try another region.' : 'Please select a region first'}
+      </div>
+    )}
+  </SelectContent>
+</Select>
+                  {errors[`country_${index}`] && (
+                    <p className="text-red-500 text-sm mt-1">{errors[`country_${index}`]}</p>
                   )}
                 </div>
                 <div className="flex items-end space-x-2">

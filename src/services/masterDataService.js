@@ -121,15 +121,46 @@ class MasterDataService {
     return country?.region || country?.region_name;
   }
 
+  // Get regions with their associated countries
+  async getRegionsWithCountries() {
+    try {
+      const response = await api.get('/regions/with-countries');
+      return response.data || [];
+    } catch (error) {
+      console.error('Error fetching regions with countries:', error);
+      throw error;
+    }
+  }
+
+  // Get countries by region ID
+  async getCountriesByRegionId(regionId) {
+    console.log('getCountriesByRegionId called with regionId:', regionId);
+    if (!regionId) {
+      console.log('No regionId provided, returning empty array');
+      return [];
+    }
+    
+    try {
+      console.log('Making API call to /countries/by-region/' + regionId);
+      const response = await api.get(`/countries/by-region/${regionId}`);
+      console.log('API response:', response.data);
+      return response.data || [];
+    } catch (error) {
+      console.error(`Error fetching countries for region ${regionId}:`, error);
+      console.error('API Error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        headers: error.response?.headers
+      });
+      return [];
+    }
+  }
+
   // Fallback regions data
   getFallbackRegions() {
     return [
-      { id: "1", name: "North America" },
-      { id: "2", name: "Europe" },
-      { id: "3", name: "Asia Pacific" },
-      { id: "4", name: "Latin America" },
-      { id: "5", name: "Middle East" },
-      { id: "6", name: "Africa" }
+      { id: "1", name: "North America" }
+ 
     ];
   }
 
