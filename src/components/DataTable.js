@@ -94,14 +94,16 @@ const DataTable = ({
           <TableHeader>
             <TableRow>
               {columns.map((column) => (
-                <TableHead key={column.key} className="font-bold text-gray-900 bg-blue-50">
-                  <div className="flex items-center">
+                <TableHead key={column.key} className="bg-blue-50">
+                  <div className="flex items-center font-medium text-sm text-gray-900">
                     {column.header}
                   </div>
                 </TableHead>
               ))}
               {(onEdit || onDelete || onView || customActions) && (
-                <TableHead className="font-bold text-gray-900 bg-blue-50 text-left">Actions</TableHead>
+                <TableHead className="bg-blue-50 text-left">
+                  <span className="font-medium text-sm text-gray-900">Actions</span>
+                </TableHead>
               )}
             </TableRow>
           </TableHeader>

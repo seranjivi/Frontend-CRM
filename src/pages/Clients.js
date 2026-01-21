@@ -450,7 +450,7 @@ const Clients = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
           <div className="pt-1">
             <div className="flex items-baseline gap-2">
-              <h1 className="text-2xl font-bold text-slate-900 font-['Manrope']">Clients</h1>
+              <h1 className="text-2xl font-bold text-slate-900">Clients</h1>
               <span className="text-sm text-slate-500">
                 ({clients.length} {clients.length === 1 ? 'record' : 'records'})
               </span>

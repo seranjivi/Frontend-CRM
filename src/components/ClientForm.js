@@ -8,9 +8,25 @@ import { toast } from 'sonner';
 import DateField from './DateField';
 import RegionDropdown from './RegionDropdown';
 import CountryDropdown from './CountryDropdown';
-import { Plus, Trash2, Building2, X } from 'lucide-react';
+import { Plus, Trash2, Building2, X, ChevronDown } from 'lucide-react';
 import { getUsers } from '../services/userService';
 import clientService from '../services/clientService';
+
+// Common country codes with their respective dial codes
+const countryCodes = [
+  { code: 'US', name: 'United States', dialCode: '+1' },
+  { code: 'IN', name: 'India', dialCode: '+91' },
+  { code: 'GB', name: 'UK', dialCode: '+44' },
+  { code: 'CA', name: 'Canada', dialCode: '+1' },
+  { code: 'AU', name: 'Australia', dialCode: '+61' },
+  { code: 'DE', name: 'Germany', dialCode: '+49' },
+  { code: 'FR', name: 'France', dialCode: '+33' },
+  { code: 'JP', name: 'Japan', dialCode: '+81' },
+  { code: 'CN', name: 'China', dialCode: '+86' },
+  { code: 'AE', name: 'UAE', dialCode: '+971' },
+  { code: 'SG', name: 'Singapore', dialCode: '+65' },
+  { code: 'MY', name: 'Malaysia', dialCode: '+60' },
+];
 
 const ClientForm = ({ client, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -24,7 +40,14 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
     account_owner: '',
     client_status: 'Active',
     notes: '',
-    contact_persons: [{ name: '', email: '', phone: '', designation: '', is_primary: false }]
+    contact_persons: [{ 
+      name: '', 
+      email: '', 
+      phone: '', 
+      countryCode: '+1', // Default country code
+      designation: '', 
+      is_primary: false 
+    }]
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -124,12 +147,13 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
         updatedContacts[index].is_primary = false;
       }
     } else if (field === 'phone') {
-      // Only allow digits and +, max 10 digits after country code
-      const cleaned = value.replace(/[^\d+]/g, '');
-      const digitsOnly = cleaned.replace(/^\+/, '');
-      if (digitsOnly.length <= 10) {
-        updatedContacts[index][field] = value;
+      // Only allow digits, max 15 digits
+      const cleaned = value.replace(/\D/g, '');
+      if (cleaned.length <= 15) {
+        updatedContacts[index][field] = cleaned;
       }
+    } else if (field === 'countryCode') {
+      updatedContacts[index].countryCode = value;
     } else {
       updatedContacts[index][field] = value;
     }
@@ -214,7 +238,17 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
   const addContact = () => {
     setFormData(prev => ({
       ...prev,
-      contact_persons: [...prev.contact_persons, { name: '', email: '', phone: '', designation: '', is_primary: false }]
+      contact_persons: [
+        ...prev.contact_persons, 
+        { 
+          name: '', 
+          email: '', 
+          phone: '', 
+          countryCode: '+1', 
+          designation: '', 
+          is_primary: false 
+        }
+      ]
     }));
   };
  
@@ -304,7 +338,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
           .map(contact => ({
             name: contact.name,
             email: contact.email,
-            phone: contact.phone,
+            phone: contact.countryCode + contact.phone,
             designation: contact.designation,
             is_primary: contact.is_primary || false
           })),
@@ -446,7 +480,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
               <Label htmlFor="customer_type">Customer Type <span className="text-red-500">*</span></Label>
               <Select
                 key={`customer-type-${formData.customer_type || 'empty'}`}
-                defaultValue={formData.customer_type || ''}
+                defaultValue={formData.customer_type || 'Partner'}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, customer_type: value }))}
                 data-testid="client-customer-type-select"
               >
@@ -519,15 +553,32 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                 </div>
                 <div className="md:col-span-3 space-y-2">
                   <Label htmlFor={`contact_phone_${index}`}>Phone</Label>
-                  <Input
-                    id={`contact_phone_${index}`}
-                    type="tel"
-                    value={contact.phone}
-                    onChange={(e) => handleContactChange(index, 'phone', e.target.value)}
-                    placeholder="+1 234 567 8900"
-                    data-testid={`contact-phone-${index}`}
-                    className="w-full h-10"
-                  />
+                  <div className="flex gap-1">
+                    <div className="relative">
+                      <select
+                        value={contact.countryCode || '+1'}
+                        onChange={(e) => handleContactChange(index, 'countryCode', e.target.value)}
+                        className="h-10 w-10 rounded-md border border-input bg-background px-0.5 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 appearance-none"
+                      >
+                        {countryCodes.map((country) => (
+                          <option key={country.code} value={country.dialCode}>
+                            {country.dialCode}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <Input
+                        id={`contact_phone_${index}`}
+                        type="tel"
+                        value={contact.phone}
+                        onChange={(e) => handleContactChange(index, 'phone', e.target.value)}
+                        placeholder="123 456 7890"
+                        data-testid={`contact-phone-${index}`}
+                        className="h-10 w-40"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div className="md:col-span-3 space-y-2">
                   <Label htmlFor={`contact_designation_${index}`}>Designation</Label>
@@ -580,7 +631,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
             {formData.addresses.map((address, index) => (
               <div
                 key={index}
-                className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 "
+                className="grid grid-cols-1 md:grid-cols-4 gap-4 pr-4 py-4"
               >
                 <div className="md:col-span-2">
                   <Label htmlFor={`address_line1_${index}`}>

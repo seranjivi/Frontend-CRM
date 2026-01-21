@@ -3,6 +3,7 @@ import opportunityService from '../services/opportunityService';
 import rfpService from '../services/rfpService';
 import clientService from '../services/clientService';
 import sowService from '../services/sowService';
+import { getUsers } from '../services/userService';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -159,16 +160,42 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     const fetchUsers = async () => {
       try {
         setIsLoadingUsers(true);
-        // Replace this with your actual API call to fetch users
-        // const response = await userService.getUsers();
-        // setUsers(response.data);
-        setUsers([
-          { id: '1', name: 'John Doe', role: 'sales' },
-          { id: '2', name: 'Jane Smith', role: 'technical' },
-          { id: '3', name: 'Mike Johnson', role: 'presales' },
-        ]);
+        const response = await getUsers();
+        // Log the raw response for debugging
+        console.log('Users API Response:', response);
+        
+        // Map the response to ensure we have the correct structure
+        const formattedUsers = Array.isArray(response) 
+          ? response 
+          : Array.isArray(response?.data) 
+            ? response.data 
+            : [];
+            
+        console.log('Formatted Users:', formattedUsers);
+        console.log('Current formData.opportunity:', {
+          sales_owner: formData.opportunity.sales_owner,
+          technical_poc: formData.opportunity.technical_poc,
+          presales_poc: formData.opportunity.presales_poc
+        });
+        
+        // Log if we can find the selected users
+        if (formData.opportunity.sales_owner) {
+          const salesOwner = formattedUsers.find(u => u.id === formData.opportunity.sales_owner || u._id === formData.opportunity.sales_owner);
+          console.log('Found sales owner:', salesOwner);
+        }
+        if (formData.opportunity.technical_poc) {
+          const techPOC = formattedUsers.find(u => u.id === formData.opportunity.technical_poc || u._id === formData.opportunity.technical_poc);
+          console.log('Found technical POC:', techPOC);
+        }
+        if (formData.opportunity.presales_poc) {
+          const presalesPOC = formattedUsers.find(u => u.id === formData.opportunity.presales_poc || u._id === formData.opportunity.presales_poc);
+          console.log('Found presales POC:', presalesPOC);
+        }
+        
+        setUsers(formattedUsers);
       } catch (error) {
         console.error('Error fetching users:', error);
+        toast.error('Failed to load users');
       } finally {
         setIsLoadingUsers(false);
       }
@@ -180,37 +207,85 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   // Update form data when opportunity prop changes
   useEffect(() => {
     if (opportunity) {
+      console.log('Raw opportunity data:', opportunity); // Debug log
+      
       setFormData({
         opportunity: {
           ...defaultFormData.opportunity,
-          ...(opportunity.opportunity || {}),
-          // Ensure required fields have proper defaults
-          opportunity_name: opportunity.opportunity?.opportunity_name || '',
-          client_name: opportunity.opportunity?.client_name || 'Unknown Client',
-          closeDate: opportunity.opportunity?.closeDate || '',
-          amount: opportunity.opportunity?.amount || '',
-          currency: opportunity.opportunity?.currency || 'USD',
-          leadSource: opportunity.opportunity?.leadSource || '',
-          type: opportunity.opportunity?.type || 'New Business',
-          triaged: opportunity.opportunity?.triaged || 'Hold',
-          pipelineStatus: opportunity.opportunity?.pipelineStatus || 'Proposal Work-in-Progress',
-          winProbability: opportunity.opportunity?.winProbability || 20,
-          nextSteps: Array.isArray(opportunity.opportunity?.nextSteps) 
-            ? opportunity.opportunity.nextSteps 
-            : [],
-          createdBy: opportunity.opportunity?.createdBy || 'System',
-          id: opportunity.opportunity?.id || ''
+          // Map API fields to form fields
+          opportunity_name: opportunity.opportunity_name || opportunity.opportunity?.opportunity_name || '',
+          client_name: opportunity.client_name || opportunity.opportunity?.client_name || 'Unknown Client',
+          closeDate: opportunity.close_date || opportunity.opportunity?.closeDate || '',
+          // Handle both snake_case and camelCase date formats, and ensure proper date string format
+          start_date: opportunity.start_date || 
+                    opportunity.opportunity?.start_date || 
+                    (opportunity.opportunity?.startDate ? 
+                      new Date(opportunity.opportunity.startDate).toISOString().split('T')[0] : 
+                      ''),
+          sales_owner: opportunity.sales_owner || opportunity.opportunity?.sales_owner || '',
+          technical_poc: opportunity.technical_poc || opportunity.opportunity?.technical_poc || '',
+          presales_poc: opportunity.presales_poc || opportunity.opportunity?.presales_poc || '',
+          amount: opportunity.amount || opportunity.opportunity?.amount || '',
+          currency: opportunity.currency || opportunity.opportunity?.currency || 'USD',
+          leadSource: opportunity.lead_source || opportunity.opportunity?.leadSource || '',
+          type: opportunity.type || opportunity.opportunity?.type || 'New Business',
+          triaged: opportunity.triaged_status || opportunity.opportunity?.triaged || 'Hold',
+          pipelineStatus: opportunity.pipeline_status || opportunity.opportunity?.pipelineStatus || 'Proposal Work-in-Progress',
+          winProbability: opportunity.win_probability || opportunity.opportunity?.winProbability || 20,
+          nextSteps: Array.isArray(opportunity.nextSteps) 
+            ? opportunity.nextSteps 
+            : (Array.isArray(opportunity.opportunity?.nextSteps) 
+                ? opportunity.opportunity.nextSteps 
+                : []),
+          createdBy: opportunity.created_by || opportunity.opportunity?.createdBy || 'System',
+          description: opportunity.description || opportunity.opportunity?.description || '',
+          id: opportunity.id || opportunity.opportunity?.id || '',
+          // Include any other direct opportunity fields that might be at the root level
+          ...(opportunity.opportunity || {})
         },
         rfpDetails: {
           ...defaultFormData.rfpDetails,
-          ...(opportunity.rfpDetails || {})
+          ...(opportunity.rfpDetails || {}),
+          // Map RFP details from root level if they exist
+          rfpTitle: opportunity.rfp_title || opportunity.rfpDetails?.rfpTitle || '',
+          rfpStatus: opportunity.rfp_status || opportunity.rfpDetails?.rfpStatus || 'Draft',
+          submissionDeadline: opportunity.submission_deadline || opportunity.rfpDetails?.submissionDeadline || '',
+          bidManager: opportunity.bid_manager || opportunity.rfpDetails?.bidManager || '',
+          submissionMode: opportunity.submission_mode || opportunity.rfpDetails?.submissionMode || '',
+          portalUrl: opportunity.portal_url || opportunity.rfpDetails?.portalUrl || '',
+          qaLogs: Array.isArray(opportunity.qa_logs) 
+            ? opportunity.qa_logs 
+            : (Array.isArray(opportunity.rfpDetails?.qaLogs) 
+                ? opportunity.rfpDetails.qaLogs 
+                : [])
         },
         sowDetails: {
           ...defaultFormData.sowDetails,
-          ...(opportunity.sowDetails || {})
+          ...(opportunity.sowDetails || {}),
+          // Map SOW details from root level if they exist
+          sowTitle: opportunity.sow_title || opportunity.sowDetails?.sowTitle || '',
+          sowStatus: opportunity.sow_status || opportunity.sowDetails?.sowStatus || 'Draft',
+          contractValue: opportunity.contract_value || opportunity.sowDetails?.contractValue || 0,
+          currency: opportunity.currency || opportunity.sowDetails?.currency || 'USD',
+          targetKickoffDate: opportunity.target_kickoff_date || opportunity.sowDetails?.targetKickoffDate || '',
+          linkedProposalRef: opportunity.linked_proposal_ref || opportunity.sowDetails?.linkedProposalRef || '',
+          scopeOverview: opportunity.scope_overview || opportunity.sowDetails?.scopeOverview || ''
         },
-        rfpDocuments: Array.isArray(opportunity.rfpDocuments) ? opportunity.rfpDocuments : [],
-        sowDocuments: Array.isArray(opportunity.sowDocuments) ? opportunity.sowDocuments : []
+        rfpDocuments: Array.isArray(opportunity.rfpDocuments) 
+          ? opportunity.rfpDocuments 
+          : [],
+        sowDocuments: Array.isArray(opportunity.sowDocuments) 
+          ? opportunity.sowDocuments 
+          : []
+      });
+      
+      console.log('Form data after setting:', {
+        ...formData,
+        opportunity: {
+          ...formData.opportunity,
+          // Don't log the entire nextSteps array to avoid cluttering the console
+          nextSteps: formData.opportunity.nextSteps?.length ? `[${formData.opportunity.nextSteps.length} items]` : '[]'
+        }
       });
     }
   }, [opportunity]);
@@ -294,9 +369,9 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           // 2. Prepare SOW data with the RFP ID
           const sowData = {
             title: formData.sowDetails.sowTitle || `SOW for ${formData.opportunity.opportunity_name}`,
-            status: formData.sowDetails.sowStatus || 'Draft',
+            status: formData.sowDetails.sowStatus || '',
             contractValue: parseFloat(formData.sowDetails.contractValue) || 0,
-            currency: formData.sowDetails.currency || 'USD',
+            currency: formData.sowDetails.currency || '',
             targetKickoffDate: formData.sowDetails.targetKickoffDate || null,
             linkedProposalRef: formData.sowDetails.linkedProposalRef || '',
             scopeOverview: formData.sowDetails.scopeOverview || '',
@@ -504,12 +579,16 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     
     setIsSubmittingNextStep(true);
     try {
+      // Get the current user from localStorage
+      const authUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const userName = authUser?.full_name || authUser?.name || authUser?.email || 'User';
+      
       const newStep = {
         id: Date.now().toString(),
         description: nextStepInput.trim(),
-        createdBy: 'Current User', 
+        createdBy: userName,
         createdAt: new Date().toISOString(),
-        userName: 'Current User' 
+        userName: userName
       };
       
       updateOpportunityData('nextSteps', [...formData.opportunity.nextSteps, newStep]);
@@ -618,7 +697,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="opportunity_name">Opportunity Name *</Label>
+                    <Label htmlFor="opportunity_name">Opportunity Name <span className="text-red-500">*</span></Label>
                     <Input
                       id="opportunity_name"
                       value={formData.opportunity.opportunity_name}
@@ -627,12 +706,12 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       className={`w-full ${formErrors.opportunity_name ? 'border-red-500' : ''}`}
                     />
                     {formErrors.opportunity_name && (
-                      <p className="text-red-500 text-sm mt-1">{formErrors.opportunity_name}</p>
+                      <p className="text-red-600 text-sm mt-1">{formErrors.opportunity_name}</p>
                     )}
                   </div>
 
                   <div>
-                    <Label htmlFor="client">Client *</Label>
+                    <Label htmlFor="client">Client <span className="text-red-600">*</span></Label>
                     <select
                       id="client"
                       value={formData.opportunity.client_name || ''}
@@ -660,8 +739,9 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <div>
-                      <Label>Start Date</Label>
+                      <Label>Start Date <span className="text-red-600">*</span></Label>
                       <input
+                        required
                         type="date"
                         value={formatDateForInput(formData.opportunity.start_date)}
                         onChange={(e) => {
@@ -675,7 +755,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   </div>
                   <div>
                     <div>
-                      <Label>Close Date *</Label>
+                      <Label>Close Date <span className="text-red-600">*</span></Label>
                       {formErrors.closeDate && (
                         <p className="text-sm text-red-600 mb-1">{formErrors.closeDate}</p>
                       )}
@@ -702,7 +782,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
 
                   <div>
                     <div>
-                      <Label htmlFor="amount">Amount *</Label>
+                      <Label htmlFor="amount">Amount <span className="text-red-600">*</span></Label>
                       {formErrors.amount && (
                         <p className="text-sm text-red-600 mb-1">{formErrors.amount}</p>
                       )}
@@ -738,7 +818,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
 
                   {/* Type */}
                   <div>
-                    <Label htmlFor="type">Type *</Label>
+                    <Label htmlFor="type">Type <span className="text-red-600">*</span></Label>
                     <Select
                       value={formData.opportunity.type}
                       onValueChange={(value) => updateOpportunityData('type', value)}
@@ -756,7 +836,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
 
                   {/* Lead Source */}
                   <div>
-                    <Label htmlFor="leadSource">Lead Source *</Label>
+                    <Label htmlFor="leadSource">Lead Source <span className="text-red-600">*</span></Label>
                     <Select
                       value={formData.opportunity.leadSource}
                       onValueChange={(value) => updateOpportunityData('leadSource', value)}
@@ -778,7 +858,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   {/* Partner Organization (Conditional) */}
                   {formData.opportunity.leadSource === 'Partner Organization' && (
                     <div>
-                      <Label htmlFor="partnerOrganization">Partner Organization *</Label>
+                      <Label htmlFor="partnerOrganization">Partner Organization <span className="text-red-600">*</span></Label>
                       <Input
                         id="partnerOrganization"
                         value={formData.opportunity.partnerOrganization}
@@ -792,7 +872,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   {/* Partner Individual (Conditional) */}
                   {formData.opportunity.leadSource === 'Partner Individual' && (
                     <div>
-                      <Label htmlFor="partnerIndividual">Partner Name *</Label>
+                      <Label htmlFor="partnerIndividual">Partner Name <span className="text-red-600">*</span></Label>
                       <Input
                         id="partnerIndividual"
                         value={formData.opportunity.partnerIndividual}
@@ -809,14 +889,34 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       onValueChange={(value) => updateOpportunityData('sales_owner', value)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select sales owner" />
+                        <SelectValue placeholder="Select sales owner">
+                          {(() => {
+                            if (!formData.opportunity.sales_owner) return 'Select a user';
+                            const user = users.find(u => String(u.id) === String(formData.opportunity.sales_owner) || String(u._id) === String(formData.opportunity.sales_owner));
+                            return user ? (user.full_name || user.name || user.email || `User ${user.id || user._id}`) : 'Select a user';
+                          })()}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {users.filter(user => user.role === 'sales').map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
+                        {isLoadingUsers ? (
+                          <div className="p-2 text-center">
+                            <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                            <p className="text-sm text-muted-foreground mt-1">Loading users...</p>
+                          </div>
+                        ) : users.length > 0 ? (
+                          users.map((user) => {
+                            const userId = user.id || user._id;
+                            return (
+                              <SelectItem key={userId} value={userId}>
+                                {user.full_name || user.name || user.email || `User ${userId}`}
+                              </SelectItem>
+                            );
+                          })
+                        ) : (
+                          <div className="p-2 text-center text-sm text-muted-foreground">
+                            No users found
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -828,14 +928,34 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       onValueChange={(value) => updateOpportunityData('technical_poc', value)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select technical POC" />
+                        <SelectValue placeholder="Select technical POC">
+                          {(() => {
+                            if (!formData.opportunity.technical_poc) return 'Select a user';
+                            const user = users.find(u => String(u.id) === String(formData.opportunity.technical_poc) || String(u._id) === String(formData.opportunity.technical_poc));
+                            return user ? (user.full_name || user.name || user.email || `User ${user.id || user._id}`) : 'Select a user';
+                          })()}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {users.filter(user => user.role === 'technical').map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
+                        {isLoadingUsers ? (
+                          <div className="p-2 text-center">
+                            <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                            <p className="text-sm text-muted-foreground mt-1">Loading users...</p>
+                          </div>
+                        ) : users.length > 0 ? (
+                          users.map((user) => {
+                            const userId = user.id || user._id;
+                            return (
+                              <SelectItem key={userId} value={userId}>
+                                {user.full_name || user.name || user.email || `User ${userId}`}
+                              </SelectItem>
+                            );
+                          })
+                        ) : (
+                          <div className="p-2 text-center text-sm text-muted-foreground">
+                            No users found
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -847,20 +967,40 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       onValueChange={(value) => updateOpportunityData('presales_poc', value)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select presales POC" />
+                        <SelectValue placeholder="Select presales POC">
+                          {(() => {
+                            if (!formData.opportunity.presales_poc) return 'Select a user';
+                            const user = users.find(u => String(u.id) === String(formData.opportunity.presales_poc) || String(u._id) === String(formData.opportunity.presales_poc));
+                            return user ? (user.full_name || user.name || user.email || `User ${user.id || user._id}`) : 'Select a user';
+                          })()}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {users.filter(user => user.role === 'presales').map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
+                        {isLoadingUsers ? (
+                          <div className="p-2 text-center">
+                            <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                            <p className="text-sm text-muted-foreground mt-1">Loading users...</p>
+                          </div>
+                        ) : users.length > 0 ? (
+                          users.map((user) => {
+                            const userId = user.id || user._id;
+                            return (
+                              <SelectItem key={userId} value={userId}>
+                                {user.full_name || user.name || user.email || `User ${userId}`}
+                              </SelectItem>
+                            );
+                          })
+                        ) : (
+                          <div className="p-2 text-center text-sm text-muted-foreground">
+                            No users found
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
                   {/* Triaged */}
                   <div>
-                    <Label htmlFor="triaged">Triaged *</Label>
+                    <Label htmlFor="triaged">Triaged <span className="text-red-600">*</span></Label>
                     <Select
                       value={formData.opportunity.triaged}
                       onValueChange={(value) => {
@@ -891,7 +1031,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   {/* Pipeline Status - Only show if not 'Drop' */}
                   {formData.opportunity.triaged !== 'Drop' && (
                     <div>
-                      <Label htmlFor="pipelineStatus">Pipeline Status *</Label>
+                      <Label htmlFor="pipelineStatus">Pipeline Status <span className="text-red-600">*</span></Label>
                       {formErrors.pipelineStatus && (
                         <p className="text-sm text-red-600 mb-1">{formErrors.pipelineStatus}</p>
                       )}
@@ -1024,7 +1164,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* RFP Title */}
                   <div className="md:col-span-2">
-                    <Label htmlFor="rfpTitle">RFP Title</Label>
+                    <Label htmlFor="rfpTitle">RFP Title <span className="text-red-600">*</span></Label>
                     <Input
                       id="rfpTitle"
                       value={formData.rfpDetails.rfpTitle}
@@ -1188,7 +1328,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* SOW Title */}
                   <div className="md:col-span-2">
-                    <Label htmlFor="sowTitle">SOW Title</Label>
+                    <Label htmlFor="sowTitle">SOW Title <span className="text-red-600">*</span></Label>
                     <Input
                       id="sowTitle"
                       value={formData.sowDetails.sowTitle}

@@ -8,7 +8,7 @@ module.exports = {
   theme: {
         extend: {
                 fontFamily: {
-                        sans: ['"Inter"', '"Roboto"', '"Segoe UI"', 'sans-serif'],
+                        sans: ['Roboto', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
                 },
                 borderRadius: {
                         lg: 'var(--radius)',
