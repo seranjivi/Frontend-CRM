@@ -18,7 +18,6 @@ const countryCodes = [
   { code: 'US', name: 'United States', dialCode: '+1' },
   { code: 'IN', name: 'India', dialCode: '+91' },
   { code: 'GB', name: 'UK', dialCode: '+44' },
-  { code: 'CA', name: 'Canada', dialCode: '+1' },
   { code: 'AU', name: 'Australia', dialCode: '+61' },
   { code: 'DE', name: 'Germany', dialCode: '+49' },
   { code: 'FR', name: 'France', dialCode: '+33' },
@@ -62,15 +61,26 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
   const parsePhoneNumber = (phoneNumber) => {
     if (!phoneNumber) return { countryCode: '+1', number: '' };
     
-    // Match country code (starts with + followed by digits)
-    const match = phoneNumber.match(/^(\+\d+)(\d+)$/);
-    if (match) {
+    // Handle cases where the number might be in format "+971-678899" or "+971678899"
+    const cleanNumber = phoneNumber.replace(/[\s-]/g, '');
+    
+    // Find the country code that matches the start of the phone number
+    const countryCodeMatch = countryCodes.find(({ dialCode }) => 
+      cleanNumber.startsWith(dialCode)
+    );
+
+    if (countryCodeMatch) {
       return {
-        countryCode: match[1],
-        number: match[2]
+        countryCode: countryCodeMatch.dialCode,
+        number: cleanNumber.substring(countryCodeMatch.dialCode.length)
       };
     }
-    return { countryCode: '+1', number: phoneNumber };
+    
+    // If no matching country code found, default to +1
+    return { 
+      countryCode: '+1', 
+      number: cleanNumber.startsWith('+') ? cleanNumber.substring(1) : cleanNumber 
+    };
   };
 
   // Fetch users and regions on component mount
@@ -219,6 +229,14 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
     }
 
     setFormData(prev => ({ ...prev, contact_persons: updatedContacts }));
+    
+    // Clear any phone-related errors when the field changes
+    if (field === 'phone' || field === 'countryCode') {
+      setErrors(prev => ({
+        ...prev,
+        [`contact_persons[${index}].phone`]: undefined
+      }));
+    }
   };
 
   const handleRegionChange = async (index, regionId) => {
@@ -656,18 +674,22 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
                   <Label htmlFor={`contact_phone_${index}`}>Phone</Label>
                   <div className="flex gap-1">
                     <div className="relative">
-                      <select
+                      <Select
                         value={contact.countryCode || '+1'}
-                        onChange={(e) => handleContactChange(index, 'countryCode', e.target.value)}
-                        className={`h-10 w-10 rounded-md border border-input bg-background px-0.5 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 appearance-none ${viewMode ? 'bg-gray-100' : ''}`}
+                        onValueChange={(value) => handleContactChange(index, 'countryCode', value)}
                         disabled={viewMode}
                       >
-                        {countryCodes.map((country) => (
-                          <option key={country.code} value={country.dialCode}>
-                            {country.dialCode}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger className={`h-10 w-[60px] ${viewMode ? 'bg-gray-100' : ''} px-1`}>
+                          <SelectValue placeholder="+1" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {countryCodes.map((country) => (
+                            <SelectItem key={country.code} value={country.dialCode}>
+                              {country.dialCode}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="flex-1">
                       <Input
@@ -677,7 +699,7 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
                         onChange={(e) => handleContactChange(index, 'phone', e.target.value)}
                         placeholder="123 456 7890"
                         data-testid={`contact-phone-${index}`}
-                        className={`h-10 w-40 ${viewMode ? 'bg-gray-100' : ''}`}
+                        className={`h-10 w-full ${viewMode ? 'bg-gray-100' : ''} -ml-px`}
                         disabled={viewMode}
                       />
                     </div>
