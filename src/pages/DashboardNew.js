@@ -5,7 +5,9 @@ import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Utils } from 'recharts';
 import { Users, Target, DollarSign, FolderOpen, Filter, Calendar, ChevronDown } from 'lucide-react';
+import opportunityService from '../services/opportunityService';
 
 const Dashboard = () => {
   // State for filters
@@ -32,38 +34,101 @@ const Dashboard = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Mock data - replace with actual API calls
-        setKpiData({
-          leads: { count: 1250, change: 12.5 },
-          opportunities: { value: 1250000, count: 42, change: 8.2 },
-          sales: { count: 89, change: 5.7 },
-          projects: { count: 36, change: 2.3 }
+        // Fetch opportunities from API
+        const response = await opportunityService.getOpportunities();
+        const opportunities = response.data || [];
+
+        // Calculate counts for specified pipeline stages
+        const stageCounts = {
+          'Proposal Work-in-Progress': 0,
+          'Proposal Review': 0,
+          'Price Negotiation': 0,
+          'Won': 0,
+          'Lost': 0
+        };
+
+        opportunities.forEach(opp => {
+          const status = opp.pipeline_status || opp.status; // Fallback to status if pipeline_status is missing
+          if (stageCounts.hasOwnProperty(status)) {
+            stageCounts[status]++;
+          }
         });
 
-        setFunnelData([
-          { name: 'Leads', value: 1250, color: '#1d4ed8' },
-          { name: 'Qualified', value: 780, color: '#3b82f6' },
-          { name: 'Opportunities', value: 420, color: '#60a5fa' },
-          { name: 'Won', value: 89, color: '#93c5fd' }
-        ]);
+        const newFunnelData = [
+          { name: 'Proposal Work-in-Progress', value: stageCounts['Proposal Work-in-Progress'], color: '#3b82f6' }, // Blue
+          { name: 'Proposal Review', value: stageCounts['Proposal Review'], color: '#8b5cf6' }, // Purple
+          { name: 'Price Negotiation', value: stageCounts['Price Negotiation'], color: '#f59e0b' }, // Orange
+          { name: 'Won', value: stageCounts['Won'], color: '#10b981' }, // Green
+          { name: 'Lost', value: stageCounts['Lost'], color: '#ef4444' } // Red
+        ];
 
-        setSourceData([
-          { name: 'Advertisement', value: 120, color: '#3b82f6' },
-          { name: 'Cold Call', value: 80, color: '#10b981' },
-          { name: 'Employee Referral', value: 150, color: '#f59e0b' },
-          { name: 'External Referral', value: 90, color: '#8b5cf6' },
-          { name: 'Online Store', value: 200, color: '#ec4899' },
-          { name: 'Partner', value: 75, color: '#06b6d4' },
-          { name: 'Public Relations', value: 60, color: '#f97316' },
-          { name: 'Sales Email', value: 180, color: '#6366f1' },
-          { name: 'Seminar / Trade Show', value: 95, color: '#14b8a6' },
-          { name: 'Web Download', value: 110, color: '#f43f5e' },
-          { name: 'Web Research', value: 70, color: '#a855f7' },
-          { name: 'Chat / Portal / Others', value: 50, color: '#84cc16' }
-        ].sort((a, b) => b.value - a.value));
+        setFunnelData(newFunnelData);
+
+        // Update KPI data with real opportunities count
+        const totalOpportunities = opportunities.length;
+        // Calculate other KPIs if possible or keep mock for now
+        setKpiData(prev => ({
+          ...prev,
+          leads: { count: 1250, change: 12.5 }, // Keep mock
+          opportunities: { value: opportunities.reduce((sum, opp) => sum + (Number(opp.amount) || 0), 0), count: totalOpportunities, change: 8.2 },
+          sales: { count: stageCounts['Won'], change: 5.7 },
+          projects: { count: 36, change: 2.3 } // Keep mock
+        }));
+
+        // Calculate counts for lead sources
+        const sourceCounts = {};
+        // Initialize with 0 for known sources to ensure they appear (optional, or just count existing)
+        // User requested specific list, let's track all of them:
+        const leadSources = [
+          'Advertisement', 'Cold Call', 'Employee Referral', 'External Referral',
+          'Online Store', 'Partner Organization', 'Partner Individual', 'Public Relations',
+          'Sales Email Alias', 'Seminar Partner', 'Internal Seminar', 'Trade Show',
+          'Web Download', 'Web Research', 'Chat', 'Portal', 'Others'
+        ];
+
+        leadSources.forEach(source => sourceCounts[source] = 0);
+
+        opportunities.forEach(opp => {
+          const source = opp.lead_source || 'Others';
+          // Normalize source if needed, or just count exact matches
+          // Check if source exists in our list, if not maybe map to Others or just add it
+          const matchedSource = leadSources.find(s => s.toLowerCase() === source.toLowerCase()) || 'Others';
+          if (sourceCounts.hasOwnProperty(matchedSource)) {
+            sourceCounts[matchedSource]++;
+          } else {
+            // Handle unexpected sources if any, map to Others
+            sourceCounts['Others']++;
+          }
+        });
+
+        // Color palette for sources
+        const sourceColors = {
+          'Advertisement': '#3b82f6',
+          'Cold Call': '#10b981',
+          'Employee Referral': '#f59e0b',
+          'External Referral': '#8b5cf6',
+          'Online Store': '#ec4899',
+          'Partner Organization': '#06b6d4',
+          'Partner Individual': '#0ea5e9',
+          'Public Relations': '#f97316',
+          'Sales Email Alias': '#6366f1',
+          'Seminar Partner': '#14b8a6',
+          'Internal Seminar': '#2dd4bf',
+          'Trade Show': '#f43f5e',
+          'Web Download': '#ef4444',
+          'Web Research': '#a855f7',
+          'Chat': '#84cc16',
+          'Portal': '#22c55e',
+          'Others': '#64748b'
+        };
+
+        const newSourceData = leadSources.map(source => ({
+          name: source,
+          value: sourceCounts[source],
+          color: sourceColors[source] || '#cbd5e1'
+        })).filter(item => item.value > 0).sort((a, b) => b.value - a.value);
+
+        setSourceData(newSourceData);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -151,7 +216,7 @@ const Dashboard = () => {
               <Filter className="h-4 w-4 text-gray-500" />
               <span className="text-sm font-medium">Filters:</span>
             </div>
-            
+
             <div className="flex-1 min-w-[200px]">
               <label className="text-xs font-medium text-gray-500 block mb-1">Time Range</label>
               <Select value={filters.timeRange} onValueChange={(value) => handleFilterChange('timeRange', value)}>
@@ -207,30 +272,30 @@ const Dashboard = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KpiCard 
-          title="Leads" 
-          value={kpiData.leads.count} 
-          change={kpiData.leads.change} 
-          icon={Users} 
+        <KpiCard
+          title="Leads"
+          value={kpiData.leads.count}
+          change={kpiData.leads.change}
+          icon={Users}
         />
-        <KpiCard 
-          title="Opportunities" 
-          value={kpiData.opportunities.value} 
-          change={kpiData.opportunities.change} 
+        <KpiCard
+          title="Opportunities"
+          value={kpiData.opportunities.value}
+          change={kpiData.opportunities.change}
           icon={Target}
-          isCurrency 
+          isCurrency
         />
-        <KpiCard 
-          title="Sales" 
-          value={kpiData.sales.count} 
-          change={kpiData.sales.change} 
-          icon={DollarSign} 
+        <KpiCard
+          title="Sales"
+          value={kpiData.sales.count}
+          change={kpiData.sales.change}
+          icon={DollarSign}
         />
-        <KpiCard 
-          title="Projects" 
-          value={kpiData.projects.count} 
-          change={kpiData.projects.change} 
-          icon={FolderOpen} 
+        <KpiCard
+          title="Projects"
+          value={kpiData.projects.count}
+          change={kpiData.projects.change}
+          icon={FolderOpen}
         />
       </div>
 
@@ -244,10 +309,10 @@ const Dashboard = () => {
             <div className="flex flex-col space-y-4 p-4">
               {funnelData.map((stage, index) => {
                 const widthPercentage = (stage.value / funnelData[0].value) * 100;
-                const conversionRate = index > 0 
+                const conversionRate = index > 0
                   ? Math.round((stage.value / funnelData[index - 1].value) * 100)
                   : 100;
-                
+
                 return (
                   <div key={stage.name} className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -261,9 +326,9 @@ const Dashboard = () => {
                         )}
                       </div>
                     </div>
-                    <div 
+                    <div
                       className="h-8 rounded-md transition-all duration-500 ease-in-out"
-                      style={{ 
+                      style={{
                         width: `${widthPercentage}%`,
                         backgroundColor: stage.color,
                         boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
@@ -303,8 +368,8 @@ const Dashboard = () => {
                   layout="horizontal"
                 >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis 
-                    dataKey="name" 
+                  <XAxis
+                    dataKey="name"
                     type="category"
                     tick={{ fontSize: 12 }}
                     angle={-45}
@@ -312,16 +377,16 @@ const Dashboard = () => {
                     height={60}
                     tickLine={false}
                   />
-                  <YAxis 
+                  <YAxis
                     type="number"
                     tick={{ fontSize: 12 }}
                     tickLine={false}
                     axisLine={false}
                   />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value) => [`${value}`, 'Count']}
                     labelFormatter={(label) => `Source: ${label}`}
-                    contentStyle={{ 
+                    contentStyle={{
                       backgroundColor: 'white',
                       border: '1px solid #e5e7eb',
                       borderRadius: '0.5rem',
@@ -331,7 +396,7 @@ const Dashboard = () => {
                     cursor={{ fill: 'rgba(0, 0, 0, 0.02)' }}
                   />
                   {sourceData.map((entry, index) => (
-                    <Bar 
+                    <Bar
                       key={`bar-${index}`}
                       dataKey="value"
                       name={entry.name}
