@@ -15,11 +15,8 @@ const Clients = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
-  const [viewingClient, setViewingClient] = useState(null);
-  const [clientDetails, setClientDetails] = useState(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
   const [filters, setFilters] = useState({
     region: '',
     client_status: '',
@@ -38,7 +35,6 @@ const Clients = () => {
   };
 
   const statusOptions = ['All Status', 'Active', 'Inactive'];
-
 
   // Filter clients based on all active filters
   const filteredClients = clients.filter(client => {
@@ -144,31 +140,12 @@ const Clients = () => {
     }
   };
 
-  const handleView = async (client) => {
-    setViewingClient(client);
-    setLoadingDetails(true);
-    try {
-      const data = await clientService.getClientById(client.id);
-      setClientDetails(data);
-    } catch (error) {
-      toast.error('Failed to fetch client details');
-    } finally {
-      setLoadingDetails(false);
-    }
-  };
-
-  const handleCloseView = () => {
-    setViewingClient(null);
-    setClientDetails(null);
-  };
-
   const handleEdit = async (client, e) => {
     if (e && typeof e.stopPropagation === 'function') {
       e.stopPropagation();
     }
     
     try {
-      setLoadingDetails(true);
       console.log('Client object:', client);
       const clientId = client.id || client._id || client.client_id;
       if (!clientId) {
@@ -176,14 +153,12 @@ const Clients = () => {
       }
       console.log('Using client ID:', clientId);
       const response = await clientService.getClientById(clientId);
-      console.log('API Response:', response); // Log the full response
+      console.log('API Response:', response);
       
       if (response) {
-        // The response might be the data directly or response.data
         const clientData = response.data || response;
         console.log('Client data:', clientData);
         
-        // Transform the API response to match the form's expected structure
         const formData = {
           id: clientData.id || clientData._id || clientData.client_id,
           client_name: clientData.client_name || '',
@@ -195,7 +170,6 @@ const Clients = () => {
           client_status: clientData.status === 'active' || clientData.client_status === 'Active' ? 'Active' : 'Inactive',
           notes: clientData.notes || '',
           account_owner: clientData.account_owner || clientData.user_id || '',
-          // Handle addresses
           addresses: clientData.addresses && clientData.addresses.length > 0 
             ? clientData.addresses.map(addr => ({
                 address_line1: addr.address_line1 || '',
@@ -207,29 +181,23 @@ const Clients = () => {
                 is_primary: addr.is_primary || false
               }))
             : [{ address_line1: '', country: '', region: '', is_primary: true }],
-          // Initialize with empty contact person if none exists
           contact_persons: clientData.contacts && clientData.contacts.length > 0
             ? clientData.contacts.map(contact => ({
                 name: contact.name || '',
                 email: contact.email || '',
                 phone: contact.phone || '',
-                designation: contact.designation || '',
+                position: contact.position || '',
                 is_primary: contact.is_primary || false
               }))
-            : [{ name: '', email: '', phone: '', designation: '', is_primary: false }]
+            : [{ name: '', email: '', phone: '', position: '', is_primary: false }]
         };
         
-        console.log('Form data to be set:', formData);
         setEditingClient(formData);
         setShowForm(true);
-      } else {
-        throw new Error('Invalid response format from server');
       }
     } catch (error) {
-      console.error('Error in handleEdit:', error);
-      toast.error('Failed to load client details: ' + (error.message || 'Unknown error'));
-    } finally {
-      setLoadingDetails(false);
+      console.error('Error fetching client details:', error);
+      toast.error('Failed to load client details');
     }
   };
 
@@ -368,17 +336,10 @@ const Clients = () => {
     {
       key: 'client_code',
       header: 'Client ID',
-      render: (value, row) => (
-        <a
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleView(row);
-          }}
-          className="text-blue-600 hover:underline"
-        >
+      render: (value) => (
+        <span className="text-blue-600">
           {value}
-        </a>
+        </span>
       ),
     },
     {
@@ -552,14 +513,12 @@ const Clients = () => {
         <DataTable
           data={filteredClients}
           columns={columns}
-          onView={handleView}
           onEdit={(client) => handleEdit(client)}
           onDelete={handleDelete}
           testId="clients-table"
           loading={loading}
           hideAddButton={true}
           editButtonClass="h-8 w-8 p-0 text-blue-600 hover:text-blue-800"
-          viewButtonClass="h-8 w-8 p-0 text-green-600 hover:text-green-800"
           deleteButtonClass="h-8 w-8 p-0 text-red-600 hover:text-red-800"
         />
       </div>
@@ -576,209 +535,15 @@ const Clients = () => {
           />
         </DialogContent>
       </Dialog>
- 
+
       <ImportCSVModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
         onFileSelect={handleFileSelect}
         title="Import Clients"
       />
- 
-      {viewingClient && (
-        <Dialog open={!!viewingClient} onOpenChange={(open) => !open && handleCloseView()}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-semibold">Client Details</h2>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleCloseView}
-                  className="h-8 w-8"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-             
-              {loadingDetails ? (
-                <div className="flex justify-center items-center h-64">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                </div>
-              ) : clientDetails ? (
-                <div className="space-y-6">
-                  {/* Basic Information Section */}
-                  <div className="bg-white rounded-lg border p-6">
-                    <h3 className="text-lg font-medium mb-4">Basic Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Client ID</label>
-                          <div className="mt-1 text-sm">{clientDetails.client_id || '-'}</div>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Client Name</label>
-                          <div className="mt-1 text-sm font-medium">{clientDetails.client_name || '-'}</div>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Email</label>
-                          <div className="mt-1 text-sm">
-                            {clientDetails.email ? (
-                              <a
-                                href={`mailto:${clientDetails.email}`}
-                                className="text-blue-600 hover:underline"
-                              >
-                                {clientDetails.email}
-                              </a>
-                            ) : '-'}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Phone</label>
-                          <div className="mt-1 text-sm">
-                            {clientDetails.phone || '-'}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Status</label>
-                          <div className="mt-1">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              clientDetails.client_status === 'Active' ? 'bg-green-100 text-green-800' :
-                              clientDetails.client_status === 'Inactive' ? 'bg-red-100 text-red-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {clientDetails.client_status || '-'}
-                            </span>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Tier</label>
-                          <div className="mt-1 text-sm">{clientDetails.client_tier || '-'}</div>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Industry</label>
-                          <div className="mt-1 text-sm">{clientDetails.industry || '-'}</div>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Created</label>
-                          <div className="mt-1 text-sm">{formatDate(clientDetails.created_at) || '-'}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
- 
-                  {/* Contact Information Section */}
-                  <div className="bg-white rounded-lg border p-6">
-                    <h3 className="text-lg font-medium mb-4">Contact Information</h3>
-                    <div className="space-y-4">
-                      {clientDetails.contact_persons?.length > 0 ? (
-                        clientDetails.contact_persons.map((contact, index) => (
-                          <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <div className="font-medium">{contact.name || 'Unnamed Contact'}</div>
-                                <div className="text-sm text-gray-500">{contact.designation || 'No designation'}</div>
-                              </div>
-                              {contact.is_primary && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                  Primary
-                                </span>
-                              )}
-                            </div>
-                            <div className="mt-2 text-sm space-y-1">
-                              {contact.email && (
-                                <div className="flex items-center">
-                                  <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">
-                                    {contact.email}
-                                  </a>
-                                </div>
-                              )}
-                              {contact.phone && (
-                                <div className="flex items-center">
-                                  <a href={`tel:${contact.phone}`} className="text-gray-600">
-                                    {contact.phone}
-                                  </a>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-sm text-gray-500">No contact information available</div>
-                      )}
-                    </div>
-                  </div>
- 
-                  {/* Address Section */}
-                  <div className="bg-white rounded-lg border p-6">
-                    <h3 className="text-lg font-medium mb-4">Address</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {clientDetails.addresses?.length > 0 ? (
-                        clientDetails.addresses.map((address, index) => (
-                          <div key={index} className="border rounded-md p-4">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <div className="font-medium">
-                                  {address.is_primary ? 'Primary Address' : 'Additional Address'}
-                                </div>
-                                <div className="text-sm text-gray-900 mt-1">
-                                  {address.address}
-                                </div>
-                                <div className="text-sm text-gray-500 mt-1">
-                                  {[address.city, address.region, address.country, address.postal_code]
-                                    .filter(Boolean)
-                                    .join(', ')}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-sm text-gray-500">No address information available</div>
-                      )}
-                    </div>
-                  </div>
- 
-                  {/* Notes Section */}
-                  {clientDetails.notes && (
-                    <div className="bg-white rounded-lg border p-6">
-                      <h3 className="text-lg font-medium mb-4">Notes</h3>
-                      <div className="whitespace-pre-line text-sm text-gray-700">
-                        {clientDetails.notes}
-                      </div>
-                    </div>
-                  )}
- 
-                  {/* Action Buttons */}
-                  <div className="flex justify-end space-x-3 pt-4">
-                    <Button
-                      variant="outline"
-                      onClick={handleCloseView}
-                    >
-                      Close
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        handleEdit(clientDetails);
-                        handleCloseView();
-                      }}
-                    >
-                      Edit Client
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  Failed to load client details. Please try again.
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 };
- 
+
 export default Clients;

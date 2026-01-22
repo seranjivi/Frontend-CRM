@@ -41,13 +41,13 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
     account_owner: '',
     client_status: 'Active',
     notes: '',
-    contact_persons: [{ 
-      name: '', 
-      email: '', 
-      phone: '', 
+    contact_persons: [{
+      name: '',
+      email: '',
+      phone: '',
       countryCode: '+1', // Default country code
-      designation: '', 
-      is_primary: false 
+      designation: '',
+      is_primary: false
     }]
   });
   const [loading, setLoading] = useState(false);
@@ -125,7 +125,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
           }
         });
       }
-      
+
       setSelectedCountryIds(countryIds);
       setFormData(initialData);
     } else {
@@ -137,7 +137,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
       setSelectedCountryIds({ 0: '' });
     }
   }, [client]);
- 
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -146,10 +146,10 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
- 
+
   const handleContactChange = (index, field, value) => {
     const updatedContacts = [...formData.contact_persons];
-   
+
     if (field === 'is_primary') {
       // If setting as primary, uncheck all others
       if (value) {
@@ -170,24 +170,24 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
     } else {
       updatedContacts[index][field] = value;
     }
-   
+
     setFormData(prev => ({ ...prev, contact_persons: updatedContacts }));
   };
- 
+
   const handleRegionChange = async (index, regionId) => {
     console.log('handleRegionChange called with regionId:', regionId);
     const region = regions.find(r => r.id === Number(regionId) || r.name === regionId);
-    
+
     if (region) {
       console.log('Selected region found:', region);
       const updatedAddresses = [...formData.addresses];
       updatedAddresses[index].region = region.name;
       setFormData(prev => ({ ...prev, addresses: updatedAddresses }));
       setSelectedRegionId(region.id);
-      
+
       // Clear country when region changes
       handleAddressChange(index, 'country', '');
-      
+
       try {
         console.log('Fetching countries for region ID:', region.id);
         const countriesData = await masterDataService.getCountriesByRegionId(region.id);
@@ -213,7 +213,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
         ...prev,
         [index]: countryId
       }));
-      
+
       // Update the form data with the country name
       handleAddressChange(index, 'country', countryName);
     }
@@ -249,7 +249,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
         addresses: [...prev.addresses, newAddress]
       };
     });
-    
+
     // Initialize the selected country ID for the new address
     setSelectedCountryIds(prev => ({
       ...prev,
@@ -262,99 +262,90 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
       const updatedAddresses = [...formData.addresses];
       const wasPrimary = updatedAddresses[index].is_primary;
       updatedAddresses.splice(index, 1);
-      
+
       // If we removed the primary address, make the first address primary
       if (wasPrimary && updatedAddresses.length > 0) {
         updatedAddresses[0].is_primary = true;
       }
-      
+
       setFormData(prev => ({
         ...prev,
         addresses: updatedAddresses
       }));
-      
+
       // Remove the selected country ID for this index
-      const newSelectedCountryIds = {...selectedCountryIds};
+      const newSelectedCountryIds = { ...selectedCountryIds };
       delete newSelectedCountryIds[index];
       setSelectedCountryIds(newSelectedCountryIds);
     }
   };
- 
+
   const addContact = () => {
     setFormData(prev => ({
       ...prev,
       contact_persons: [
-        ...prev.contact_persons, 
-        { 
-          name: '', 
-          email: '', 
-          phone: '', 
-          countryCode: '+1', 
-          designation: '', 
-          is_primary: false 
+        ...prev.contact_persons,
+        {
+          name: '',
+          email: '',
+          phone: '',
+          countryCode: '+1',
+          designation: '',
+          is_primary: false
         }
       ]
     }));
   };
- 
+
   const removeContact = (index) => {
     if (formData.contact_persons.length > 1) {
       const updatedContacts = formData.contact_persons.filter((_, i) => i !== index);
       setFormData(prev => ({ ...prev, contact_persons: updatedContacts }));
     }
   };
- 
+
   const validateForm = () => {
     const newErrors = {};
-   
+
     if (!formData.client_name.trim()) {
       newErrors.client_name = 'Client name is required';
     }
-   
+
     if (!formData.contact_email.trim()) {
       newErrors.contact_email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contact_email)) {
       newErrors.contact_email = 'Please enter a valid email';
     }
-   
+
     if (!formData.customer_type) {
       newErrors.customer_type = 'Customer type is required';
     }
-   
-    // Validate addresses
-    let hasValidAddress = false;
-    formData.addresses.forEach((address, index) => {
-      if (address.address_line1 && address.address_line1.trim() !== '') {
-        hasValidAddress = true;
-      } else if (!newErrors.addresses) {
-        newErrors.addresses = 'Address Line 1 is required for at least one address';
-      }
-    });
-   
-    if (!hasValidAddress) {
-      newErrors.addresses = 'At least one address with Address Line 1 is required';
+
+    // Validate addresses - at least one address is required
+    if (formData.addresses.length === 0) {
+      newErrors.addresses = 'At least one address is required';
     }
-   
+
     if (!formData.account_owner) {
       newErrors.account_owner = 'Account owner is required';
     }
-   
+
     if (!formData.client_status) {
       newErrors.client_status = 'Status is required';
     }
-   
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
- 
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       toast.error('Please fill in all required fields');
       return;
     }
-    
+
     setLoading(true);
 
     try {
@@ -400,7 +391,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
         await clientService.createClient(payload);
         toast.success('Client created successfully');
       }
-      
+
       // Call onSuccess if provided, otherwise just close the form
       if (onSuccess) {
         onSuccess();
@@ -414,7 +405,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
       setLoading(false);
     }
   };
- 
+
   return (
     <div className="w-full max-w-4xl mx-auto p-6">
       <form onSubmit={handleSubmit} className="space-y-8">
@@ -445,6 +436,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                 name="client_name"
                 value={formData.client_name}
                 onChange={handleChange}
+                placeholder="Enter the client name"
                 className={errors.client_name ? 'border-red-500' : ''}
                 data-testid="client-name-input"
               />
@@ -460,6 +452,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                 type="email"
                 value={formData.contact_email}
                 onChange={handleChange}
+                placeholder="client@example.com"
                 className={errors.contact_email ? 'border-red-500' : ''}
                 data-testid="client-email-input"
               />
@@ -552,7 +545,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
             </div>
           </div>
         </div>
- 
+
         {/* Section 2 - Contact Persons */}
         <div>
           <div className="flex justify-between items-center mb-4">
@@ -654,7 +647,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
             {/* Removed the standalone Add Contact button as it's now inline */}
           </div>
         </div>
- 
+
         {/* Section 3 - Address Details */}
         <div>
           <div className="flex justify-between items-center mb-4">
@@ -677,7 +670,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
               >
                 <div className="md:col-span-2">
                   <Label htmlFor={`address_line1_${index}`}>
-                    Address Line 1 <span className="text-red-500">*</span> {address.is_primary && <span className="text-blue-600 ml-2">(Primary)</span>}
+                    Address Line 1 {address.is_primary && <span className="text-blue-600 ml-2">(Primary)</span>}
                   </Label>
                   <Textarea
                     id={`address_line1_${index}`}
@@ -696,36 +689,36 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                     onValueChange={async (value) => {
                       console.log('handleRegionChange called with regionId:', value);
                       const region = regions.find(r => r.id === Number(value) || r.name === value);
-                      
+
                       if (region) {
                         console.log('Selected region found:', region);
                         const updatedAddresses = [...formData.addresses];
                         updatedAddresses[index].region = region.name;
                         setFormData(prev => ({ ...prev, addresses: updatedAddresses }));
                         setSelectedRegionId(region.id);
-                        
+
                         // Clear country when region changes
                         handleAddressChange(index, 'country', '');
-                        
+
                         try {
-                            console.log('Fetching countries for region ID:', region.id);
-                            const response = await masterDataService.getCountriesByRegionId(region.id);
-                            console.log('API response:', response);
-                            
-                            // Extract countries from response.data
-                            const countriesData = response?.data || [];
-                            console.log('Countries data:', countriesData);
-                            
-                            // Map the data to the expected format
-                            const formattedCountries = countriesData.map(country => ({
-                              id: country.id,
-                              name: country.name,
-                              code: country.code,
-                              phone_code: country.phone_code
-                            }));
-                            
-                            console.log('Formatted countries:', formattedCountries);
-                            setCountries(formattedCountries);
+                          console.log('Fetching countries for region ID:', region.id);
+                          const response = await masterDataService.getCountriesByRegionId(region.id);
+                          console.log('API response:', response);
+
+                          // Extract countries from response.data
+                          const countriesData = response?.data || [];
+                          console.log('Countries data:', countriesData);
+
+                          // Map the data to the expected format
+                          const formattedCountries = countriesData.map(country => ({
+                            id: country.id,
+                            name: country.name,
+                            code: country.code,
+                            phone_code: country.phone_code
+                          }));
+
+                          console.log('Formatted countries:', formattedCountries);
+                          setCountries(formattedCountries);
                         } catch (error) {
                           console.error('Error in handleRegionChange:', error);
                           toast.error('Failed to load countries');
@@ -736,13 +729,15 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                       }
                     }}
                   >
-                    <SelectTrigger className={errors[`region_${index}`] ? 'border-red-500' : ''}>
-                      <SelectValue>{address.region || 'Select a region...'}</SelectValue>
+                    <SelectTrigger className={`${errors[`region_${index}`] ? 'border-red-500' : ''} ${!address.region ? 'text-muted-foreground' : ''}`}>
+                      <SelectValue placeholder="Select a region...">
+                        {address.region || 'Select a region...'}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {regions.map((region) => (
-                        <SelectItem 
-                          key={region.id} 
+                        <SelectItem
+                          key={region.id}
                           value={region.id.toString()}
                         >
                           {region.name}
@@ -757,37 +752,39 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                 <div className="space-y-2">
                   <Label htmlFor={`country_${index}`}>Country</Label>
                   <Select
-  value={address.country || ''}
-  onValueChange={(value) => {
-    console.log('Country selected:', value);
-    const selectedCountry = countries.find(c => c.name === value);
-    if (selectedCountry) {
-      console.log('Selected country:', selectedCountry);
-      handleAddressChange(index, 'country', selectedCountry.name);
-    }
-  }}
-  disabled={!selectedRegionId}
->
-  <SelectTrigger className={errors[`country_${index}`] ? 'border-red-500' : ''}>
-    <SelectValue>{address.country || (countries.length ? 'Select a country...' : 'Select a region first')}</SelectValue>
-  </SelectTrigger>
-  <SelectContent>
-    {countries.length > 0 ? (
-      countries.map((country) => (
-        <SelectItem 
-          key={country.id} 
-          value={country.name}
-        >
-          {country.name}
-        </SelectItem>
-      ))
-    ) : (
-      <div className="px-3 py-2 text-sm text-muted-foreground">
-        {selectedRegionId ? 'No countries found. Please try another region.' : 'Please select a region first'}
-      </div>
-    )}
-  </SelectContent>
-</Select>
+                    value={address.country || ''}
+                    onValueChange={(value) => {
+                      console.log('Country selected:', value);
+                      const selectedCountry = countries.find(c => c.name === value);
+                      if (selectedCountry) {
+                        console.log('Selected country:', selectedCountry);
+                        handleAddressChange(index, 'country', selectedCountry.name);
+                      }
+                    }}
+                    disabled={!selectedRegionId}
+                  >
+                    <SelectTrigger className={`${errors[`country_${index}`] ? 'border-red-500' : ''} ${!address.country ? 'text-muted-foreground' : ''}`}>
+                      <SelectValue placeholder={countries.length ? 'Select a country...' : 'Select a region first'}>
+                        {address.country || (countries.length ? 'Select a country...' : 'Select a region first')}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {countries.length > 0 ? (
+                        countries.map((country) => (
+                          <SelectItem
+                            key={country.id}
+                            value={country.name}
+                          >
+                            {country.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          {selectedRegionId ? 'No countries found. Please try another region.' : 'Please select a region first'}
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
                   {errors[`country_${index}`] && (
                     <p className="text-red-500 text-sm mt-1">{errors[`country_${index}`]}</p>
                   )}
@@ -823,7 +820,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
             ))}
           </div>
         </div>
- 
+
         {/* Section 4 - Account & Status */}
         <div>
           <h3 className="text-lg font-medium text-[#0A2A43] mb-4">Account & Status</h3>
@@ -832,26 +829,26 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
               <Label htmlFor="account_owner">Account Owner <span className="text-red-500">*</span></Label>
               <div className="relative">
                 <Select
-  value={formData.account_owner ? String(formData.account_owner) : ''}
-  onValueChange={(value) => {
-    setFormData(prev => ({ ...prev, account_owner: value }));
-    if (errors.account_owner) {
-      setErrors(prev => ({ ...prev, account_owner: '' }));
-    }
-  }}
->
-  <SelectTrigger className={errors.account_owner ? 'border-red-500' : ''}>
-    <SelectValue placeholder="Select account owner..." />
-  </SelectTrigger>
+                  value={formData.account_owner ? String(formData.account_owner) : ''}
+                  onValueChange={(value) => {
+                    setFormData(prev => ({ ...prev, account_owner: value }));
+                    if (errors.account_owner) {
+                      setErrors(prev => ({ ...prev, account_owner: '' }));
+                    }
+                  }}
+                >
+                  <SelectTrigger className={errors.account_owner ? 'border-red-500' : ''}>
+                    <SelectValue placeholder="Select account owner..." />
+                  </SelectTrigger>
 
-  <SelectContent>
-    {users.map((user) => (
-      <SelectItem key={user.id} value={String(user.id)}>
-        {user.full_name || user.email}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
+                  <SelectContent>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={String(user.id)}>
+                        {user.full_name || user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
               </div>
               {errors.account_owner && (
@@ -879,7 +876,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
             </div>
           </div>
         </div>
- 
+
         {/* Section 5 - Notes / Description */}
         <div>
           <h3 className="text-lg font-medium text-[#0A2A43] mb-4">Notes / Description</h3>
@@ -895,7 +892,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
             />
           </div>
         </div>
- 
+
         {/* Action Buttons */}
         <div className="flex justify-end gap-4 mb-4">
           <Button
@@ -920,7 +917,6 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
     </div>
   );
 };
- 
+
 export default ClientForm;
- 
- 
+
