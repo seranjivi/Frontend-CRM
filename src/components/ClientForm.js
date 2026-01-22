@@ -29,8 +29,8 @@ const countryCodes = [
   { code: 'MY', name: 'Malaysia', dialCode: '+60' },
 ];
 
-const ClientForm = ({ client, onClose, onSuccess }) => {
-  const [formData, setFormData] = useState({
+const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
+  const [formData, setFormData] = useState(viewMode ? client : {
     client_name: '',
     contact_email: '',
     website: '',
@@ -45,7 +45,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
       name: '',
       email: '',
       phone: '',
-      countryCode: '+1', // Default country code
+      countryCode: '+1', 
       designation: '',
       is_primary: false
     }]
@@ -57,6 +57,21 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
   const [regions, setRegions] = useState([]);
   const [selectedRegionId, setSelectedRegionId] = useState(null);
   const [countries, setCountries] = useState([]);
+
+  // Helper function to parse phone number into country code and number
+  const parsePhoneNumber = (phoneNumber) => {
+    if (!phoneNumber) return { countryCode: '+1', number: '' };
+    
+    // Match country code (starts with + followed by digits)
+    const match = phoneNumber.match(/^(\+\d+)(\d+)$/);
+    if (match) {
+      return {
+        countryCode: match[1],
+        number: match[2]
+      };
+    }
+    return { countryCode: '+1', number: phoneNumber };
+  };
 
   // Fetch users and regions on component mount
   useEffect(() => {
@@ -93,6 +108,16 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
 
   useEffect(() => {
     if (client) {
+      // Parse contact persons to extract country codes
+      const parsedContacts = client.contact_persons?.map(contact => {
+        const { countryCode, number } = parsePhoneNumber(contact.phone || '');
+        return {
+          ...contact,
+          phone: number,
+          countryCode: countryCode || '+1'
+        };
+      }) || [];
+
       const initialData = {
         client_name: client.client_name || '',
         contact_email: client.contact_email || '',
@@ -102,13 +127,18 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
         gst_tax_id: client.gst_tax_id || '',
         addresses: client.addresses && client.addresses.length > 0
           ? client.addresses
-          : [{ address: '', country: '', region: '', is_primary: true }],
+          : [{ address_line1: '', country: '', region: '', is_primary: true }],
         account_owner: client.account_owner || '',
         client_status: client.client_status || 'Active',
         notes: client.notes || '',
-        contact_persons: client.contact_persons && client.contact_persons.length > 0
-          ? client.contact_persons
-          : [{ name: '', email: '', phone: '', designation: '', is_primary: false }]
+        contact_persons: parsedContacts.length ? parsedContacts : [{
+          name: '',
+          email: '',
+          phone: '',
+          countryCode: '+1',
+          designation: '',
+          is_primary: false
+        }]
       };
       console.log('Initial data:', initialData);
 
@@ -119,8 +149,6 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
           if (addr.country_id) {
             countryIds[idx] = addr.country_id;
           } else if (addr.country) {
-            // If we have a country name but no ID, we'll need to look it up
-            // For now, we'll just set it to null and it will be updated when the country is selected
             countryIds[idx] = null;
           }
         });
@@ -129,18 +157,28 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
       setSelectedCountryIds(countryIds);
       setFormData(initialData);
     } else {
-      // For new client, initialize with one empty address
+      // For new client, initialize with one empty address and contact
       setFormData(prev => ({
         ...prev,
-        addresses: [{ address: '', country: '', region: '', is_primary: true }]
+        addresses: [{ address_line1: '', country: '', region: '', is_primary: true }],
+        contact_persons: [{
+          name: '',
+          email: '',
+          phone: '',
+          countryCode: '+1',
+          designation: '',
+          is_primary: false
+        }]
       }));
       setSelectedCountryIds({ 0: '' });
     }
   }, [client]);
 
   const handleChange = (e) => {
+    if (viewMode) return;
+
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
     // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
@@ -148,6 +186,8 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
   };
 
   const handleContactChange = (index, field, value) => {
+    if (viewMode) return;
+
     const updatedContacts = [...formData.contact_persons];
 
     if (field === 'is_primary') {
@@ -166,7 +206,14 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
         updatedContacts[index][field] = cleaned;
       }
     } else if (field === 'countryCode') {
+      // Update the country code
       updatedContacts[index].countryCode = value;
+      // If there's a phone number, ensure it's formatted with the new country code
+      if (updatedContacts[index].phone) {
+        // Remove any existing country code from the phone number
+        const phoneWithoutCode = updatedContacts[index].phone.replace(/^\+?\d+/, '');
+        updatedContacts[index].phone = phoneWithoutCode;
+      }
     } else {
       updatedContacts[index][field] = value;
     }
@@ -220,6 +267,8 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
   };
 
   const handleAddressChange = (index, field, value) => {
+    if (viewMode) return;
+
     const updatedAddresses = [...formData.addresses];
     updatedAddresses[index][field] = value;
     setFormData(prev => ({ ...prev, addresses: updatedAddresses }));
@@ -236,6 +285,8 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
   };
 
   const addAddress = () => {
+    if (viewMode) return;
+
     const newIndex = formData.addresses.length;
     setFormData(prev => {
       const newAddress = {
@@ -258,50 +309,48 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
   };
 
   const removeAddress = (index) => {
-    if (formData.addresses.length > 1) {
-      const updatedAddresses = [...formData.addresses];
-      const wasPrimary = updatedAddresses[index].is_primary;
-      updatedAddresses.splice(index, 1);
+    if (viewMode || formData.addresses.length <= 1) return;
 
-      // If we removed the primary address, make the first address primary
-      if (wasPrimary && updatedAddresses.length > 0) {
-        updatedAddresses[0].is_primary = true;
-      }
+    const updatedAddresses = [...formData.addresses];
+    const wasPrimary = updatedAddresses[index].is_primary;
+    updatedAddresses.splice(index, 1);
 
-      setFormData(prev => ({
-        ...prev,
-        addresses: updatedAddresses
-      }));
-
-      // Remove the selected country ID for this index
-      const newSelectedCountryIds = { ...selectedCountryIds };
-      delete newSelectedCountryIds[index];
-      setSelectedCountryIds(newSelectedCountryIds);
+    // If we removed the primary address, make the first address primary
+    if (wasPrimary && updatedAddresses.length > 0) {
+      updatedAddresses[0].is_primary = true;
     }
+
+    setFormData(prev => ({
+      ...prev,
+      addresses: updatedAddresses
+    }));
+
+    // Remove the selected country ID for this index
+    const newSelectedCountryIds = { ...selectedCountryIds };
+    delete newSelectedCountryIds[index];
+    setSelectedCountryIds(newSelectedCountryIds);
   };
 
-  const addContact = () => {
+  const addContactPerson = () => {
+    if (viewMode) return;
+
     setFormData(prev => ({
       ...prev,
       contact_persons: [
         ...prev.contact_persons,
-        {
-          name: '',
-          email: '',
-          phone: '',
-          countryCode: '+1',
-          designation: '',
-          is_primary: false
-        }
+        { name: '', email: '', phone: '', countryCode: '+1', designation: '', is_primary: false }
       ]
     }));
   };
+  
+  // Alias for addContactPerson to handle any existing references
+  const addContact = addContactPerson;
 
   const removeContact = (index) => {
-    if (formData.contact_persons.length > 1) {
-      const updatedContacts = formData.contact_persons.filter((_, i) => i !== index);
-      setFormData(prev => ({ ...prev, contact_persons: updatedContacts }));
-    }
+    if (viewMode || !formData.contact_persons || formData.contact_persons.length <= 1) return;
+
+    const updatedContacts = formData.contact_persons.filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, contact_persons: updatedContacts }));
   };
 
   const validateForm = () => {
@@ -339,6 +388,11 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
   };
 
   const handleSubmit = async (e) => {
+    if (viewMode) {
+      onClose();
+      return;
+    }
+
     e.preventDefault();
 
     if (!validateForm()) {
@@ -414,7 +468,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
           <div className="flex items-center gap-3">
             <Building2 className="w-6 h-6 text-[#0A2A43]" />
             <h2 className="text-2xl font-semibold text-[#0A2A43]">
-              {client ? 'EDIT CLIENT' : 'NEW CLIENT'}
+              {viewMode ? 'VIEW CLIENT DETAILS' : client ? 'EDIT CLIENT' : 'NEW CLIENT'}
             </h2>
           </div>
           {/* <Button
@@ -437,8 +491,9 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                 value={formData.client_name}
                 onChange={handleChange}
                 placeholder="Enter the client name"
-                className={errors.client_name ? 'border-red-500' : ''}
+                className={`${errors.client_name ? 'border-red-500' : ''} ${viewMode ? 'bg-gray-100' : ''}`}
                 data-testid="client-name-input"
+                disabled={viewMode}
               />
               {errors.client_name && (
                 <p className="text-red-500 text-sm mt-1">{errors.client_name}</p>
@@ -453,8 +508,9 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                 value={formData.contact_email}
                 onChange={handleChange}
                 placeholder="client@example.com"
-                className={errors.contact_email ? 'border-red-500' : ''}
+                className={`${errors.contact_email ? 'border-red-500' : ''} ${viewMode ? 'bg-gray-100' : ''}`}
                 data-testid="client-email-input"
+                disabled={viewMode}
               />
               {errors.contact_email && (
                 <p className="text-red-500 text-sm mt-1">{errors.contact_email}</p>
@@ -469,7 +525,9 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                 value={formData.website}
                 onChange={handleChange}
                 placeholder="https://example.com"
+                className={viewMode ? 'bg-gray-100' : ''}
                 data-testid="client-website-input"
+                disabled={viewMode}
               />
             </div>
             <div className="space-y-2">
@@ -481,6 +539,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                   setFormData(prev => ({ ...prev, industry: value }));
                 }}
                 data-testid="client-industry-select"
+                disabled={viewMode}
               >
                 <SelectTrigger className={!formData.industry ? 'text-muted-foreground' : ''}>
                   <SelectValue placeholder="Select industry..." />
@@ -509,7 +568,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
             <div className="space-y-2">
               <Label htmlFor="customer_type">Customer Type <span className="text-red-500">*</span></Label>
               <Select
-                value={formData.customer_type}   // 
+                value={formData.customer_type}
                 onValueChange={(value) => {
                   setFormData(prev => ({ ...prev, customer_type: value }));
                   if (errors.customer_type) {
@@ -517,6 +576,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                   }
                 }}
                 data-testid="client-customer-type-select"
+                disabled={viewMode}
               >
                 <SelectTrigger className={errors.customer_type ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select customer type..." />
@@ -540,7 +600,9 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                 value={formData.gst_tax_id}
                 onChange={handleChange}
                 placeholder="e.g. 27AAAPL1234C1ZV"
+                className={viewMode ? 'bg-gray-100' : ''}
                 data-testid="client-gst-input"
+                disabled={viewMode}
               />
             </div>
           </div>
@@ -550,15 +612,17 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
         <div>
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-[#0A2A43]">Contact Persons</h3>
-            <Button
-              type="button"
-              onClick={addContact}
-              className="flex items-center gap-2 h-10 bg-[#0A2A43] hover:bg-[#0A2A43]/90 text-white"
-              data-testid="add-contact-button"
-            >
-              <Plus className="w-4 h-4" />
-              Add Contact
-            </Button>
+            {!viewMode && (
+              <Button
+                type="button"
+                onClick={addContact}
+                className="flex items-center gap-2 h-10 bg-[#0A2A43] hover:bg-[#0A2A43]/90 text-white"
+                data-testid="add-contact-button"
+              >
+                <Plus className="w-4 h-4" />
+                Add Contact
+              </Button>
+            )}
           </div>
           <div className="space-y-4">
             {formData.contact_persons.map((contact, index) => (
@@ -571,7 +635,8 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                     onChange={(e) => handleContactChange(index, 'name', e.target.value)}
                     placeholder="Contact name"
                     data-testid={`contact-name-${index}`}
-                    className="w-full h-10"
+                    className={`w-full h-10 ${viewMode ? 'bg-gray-100' : ''}`}
+                    disabled={viewMode}
                   />
                 </div>
                 <div className="md:col-span-3 space-y-2">
@@ -583,7 +648,8 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                     onChange={(e) => handleContactChange(index, 'email', e.target.value)}
                     placeholder="contact@example.com"
                     data-testid={`contact-email-${index}`}
-                    className="w-full h-10"
+                    className={`w-full h-10 ${viewMode ? 'bg-gray-100' : ''}`}
+                    disabled={viewMode}
                   />
                 </div>
                 <div className="md:col-span-3 space-y-2">
@@ -593,7 +659,8 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                       <select
                         value={contact.countryCode || '+1'}
                         onChange={(e) => handleContactChange(index, 'countryCode', e.target.value)}
-                        className="h-10 w-10 rounded-md border border-input bg-background px-0.5 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 appearance-none"
+                        className={`h-10 w-10 rounded-md border border-input bg-background px-0.5 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 appearance-none ${viewMode ? 'bg-gray-100' : ''}`}
+                        disabled={viewMode}
                       >
                         {countryCodes.map((country) => (
                           <option key={country.code} value={country.dialCode}>
@@ -610,7 +677,8 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                         onChange={(e) => handleContactChange(index, 'phone', e.target.value)}
                         placeholder="123 456 7890"
                         data-testid={`contact-phone-${index}`}
-                        className="h-10 w-40"
+                        className={`h-10 w-40 ${viewMode ? 'bg-gray-100' : ''}`}
+                        disabled={viewMode}
                       />
                     </div>
                   </div>
@@ -625,7 +693,8 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                         onChange={(e) => handleContactChange(index, 'designation', e.target.value)}
                         placeholder="e.g. Manager, Director"
                         data-testid={`contact-designation-${index}`}
-                        className="w-full h-10"
+                        className={`w-full h-10 ${viewMode ? 'bg-gray-100' : ''}`}
+                        disabled={viewMode}
                       />
                     </div>
                     {formData.contact_persons.length > 1 && (
@@ -652,15 +721,17 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
         <div>
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-[#0A2A43]">Address Details</h3>
-            <Button
-              type="button"
-              onClick={addAddress}
-              className="flex items-center gap-2 bg-[#0A2A43] hover:bg-[#0A2A43]/90 text-white"
-              data-testid="add-address-button"
-            >
-              <Plus className="w-4 h-4" />
-              Add Address
-            </Button>
+            {!viewMode && (
+              <Button
+                type="button"
+                onClick={addAddress}
+                className="flex items-center gap-2 bg-[#0A2A43] hover:bg-[#0A2A43]/90 text-white"
+                data-testid="add-address-button"
+              >
+                <Plus className="w-4 h-4" />
+                Add Address
+              </Button>
+            )}
           </div>
           <div className="space-y-4">
             {formData.addresses.map((address, index) => (
@@ -679,7 +750,8 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                     rows={3}
                     placeholder="123 Main St, Suite 100, City, State 12345"
                     data-testid={`address-${index}`}
-                    className={errors[`address_${index}`] ? 'border-red-500' : ''}
+                    className={`${errors[`address_${index}`] ? 'border-red-500' : ''} ${viewMode ? 'bg-gray-100' : ''}`}
+                    disabled={viewMode}
                   />
                 </div>
                 <div className="space-y-2">
@@ -687,6 +759,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                   <Select
                     value={address.region || ''}
                     onValueChange={async (value) => {
+                      if (viewMode) return;
                       console.log('handleRegionChange called with regionId:', value);
                       const region = regions.find(r => r.id === Number(value) || r.name === value);
 
@@ -728,6 +801,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                         console.warn('No region found for ID:', value);
                       }
                     }}
+                    disabled={viewMode}
                   >
                     <SelectTrigger className={`${errors[`region_${index}`] ? 'border-red-500' : ''} ${!address.region ? 'text-muted-foreground' : ''}`}>
                       <SelectValue placeholder="Select a region...">
@@ -754,6 +828,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                   <Select
                     value={address.country || ''}
                     onValueChange={(value) => {
+                      if (viewMode) return;
                       console.log('Country selected:', value);
                       const selectedCountry = countries.find(c => c.name === value);
                       if (selectedCountry) {
@@ -761,7 +836,7 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                         handleAddressChange(index, 'country', selectedCountry.name);
                       }
                     }}
-                    disabled={!selectedRegionId}
+                    disabled={!selectedRegionId || viewMode}
                   >
                     <SelectTrigger className={`${errors[`country_${index}`] ? 'border-red-500' : ''} ${!address.country ? 'text-muted-foreground' : ''}`}>
                       <SelectValue placeholder={countries.length ? 'Select a country...' : 'Select a region first'}>
@@ -795,8 +870,8 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                     variant="outline"
                     size="sm"
                     onClick={() => setPrimaryAddress(index)}
-                    disabled={address.is_primary}
-                    className={`${address.is_primary ? 'bg-blue-100 text-blue-700' : 'hover:bg-blue-50'}`}
+                    disabled={address.is_primary || viewMode}
+                    className={`${address.is_primary ? 'bg-blue-100 text-blue-700' : 'hover:bg-blue-50'} ${viewMode ? 'opacity-50' : ''}`}
                     data-testid={`set-primary-${index}`}
                   >
                     {address.is_primary ? 'Primary' : 'Set as Primary'}
@@ -807,10 +882,10 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                       variant="ghost"
                       size="icon"
                       onClick={() => removeAddress(index)}
-                      className="text-red-500 hover:text-red-700"
+                      className={`text-red-500 hover:text-red-700 ${viewMode ? 'opacity-50' : ''}`}
                       data-testid={`remove-address-${index}`}
-                      disabled={address.is_primary}
-                      title={address.is_primary ? 'Cannot remove primary address' : 'Remove address'}
+                      disabled={address.is_primary || viewMode}
+                      title={viewMode ? '' : (address.is_primary ? 'Cannot remove primary address' : 'Remove address')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -831,11 +906,13 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
                 <Select
                   value={formData.account_owner ? String(formData.account_owner) : ''}
                   onValueChange={(value) => {
+                    if (viewMode) return;
                     setFormData(prev => ({ ...prev, account_owner: value }));
                     if (errors.account_owner) {
                       setErrors(prev => ({ ...prev, account_owner: '' }));
                     }
                   }}
+                  disabled={viewMode}
                 >
                   <SelectTrigger className={errors.account_owner ? 'border-red-500' : ''}>
                     <SelectValue placeholder="Select account owner..." />
@@ -859,8 +936,12 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
               <Label htmlFor="client_status">Status <span className="text-red-500">*</span></Label>
               <Select
                 value={formData.client_status}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, client_status: value }))}
+                onValueChange={(value) => {
+                  if (viewMode) return;
+                  setFormData(prev => ({ ...prev, client_status: value }));
+                }}
                 data-testid="client-status-select"
+                disabled={viewMode}
               >
                 <SelectTrigger className={errors.client_status ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select status..." />
@@ -889,6 +970,8 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
               rows={4}
               placeholder="Additional notes about this client..."
               data-testid="client-notes-input"
+              className={viewMode ? 'bg-gray-100' : ''}
+              disabled={viewMode}
             />
           </div>
         </div>
@@ -902,16 +985,18 @@ const ClientForm = ({ client, onClose, onSuccess }) => {
             disabled={loading}
             className="px-6"
           >
-            Cancel
+            {viewMode ? 'Close' : 'Cancel'}
           </Button>
-          <Button
-            type="submit"
-            disabled={loading}
-            data-testid="client-form-submit"
-            className="px-6 bg-[#0A2A43] hover:bg-[#0A2A43]/90 text-white"
-          >
-            {loading ? 'Saving...' : (client ? 'Update Client' : 'Create Client')}
-          </Button>
+          {!viewMode && (
+            <Button
+              type="submit"
+              disabled={loading}
+              data-testid="client-form-submit"
+              className="px-6 bg-[#0A2A43] hover:bg-[#0A2A43]/90 text-white"
+            >
+              {loading ? 'Saving...' : (client ? 'Update Client' : 'Create Client')}
+            </Button>
+          )}
         </div>
       </form>
     </div>

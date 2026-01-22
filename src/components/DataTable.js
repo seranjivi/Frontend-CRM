@@ -22,6 +22,9 @@ const DataTable = ({
   renderToolbarActions,
   customActions,  
   showEdit = true,
+  viewButtonClass = 'h-8 w-8 p-0 text-gray-600 hover:text-gray-800',
+  editButtonClass = 'h-8 w-8 p-0 text-blue-600 hover:text-blue-800',
+  deleteButtonClass = 'h-8 w-8 p-0 text-red-600 hover:text-red-800',
   title = 'Data Table'
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -119,7 +122,7 @@ const DataTable = ({
                     </TableCell>
                   ))}
                   <TableCell className="text-left">
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       {customActions ? (
                         customActions(item)
                       ) : (
@@ -128,8 +131,12 @@ const DataTable = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => onView(item)}
-                              className="h-8 w-8 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onView(item);
+                              }}
+                              className={viewButtonClass}
+                              title="View"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
@@ -138,8 +145,12 @@ const DataTable = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => onEdit(item)}
-                              className="h-8 w-8 p-0 text-black hover:text-gray-800"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEdit(item);
+                              }}
+                              className={editButtonClass}
+                              title="Edit"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -151,8 +162,12 @@ const DataTable = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => onDelete(item)}
-                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(item);
+                              }}
+                              className={deleteButtonClass}
+                              title="Delete"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

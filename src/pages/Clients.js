@@ -15,8 +15,10 @@ const Clients = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
+  const [viewingClient, setViewingClient] = useState(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [isViewMode, setIsViewMode] = useState(false);
   const [filters, setFilters] = useState({
     region: '',
     client_status: '',
@@ -140,24 +142,86 @@ const Clients = () => {
     }
   };
 
+  const handleView = async (client, e) => {
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+    }
+    
+    try {
+      console.log('Client object (view):', client);
+      const clientId = client.id || client._id || client.client_id;
+      if (!clientId) {
+        throw new Error('Client ID not found');
+      }
+      console.log('Using client ID (view):', clientId);
+      const response = await clientService.getClientById(clientId);
+      console.log('API Response (view):', response);
+      
+      if (response) {
+        const clientData = response.data || response;
+        console.log('Client data (view):', clientData);
+        
+        const formData = {
+          id: clientData.id || clientData._id || clientData.client_id,
+          client_name: clientData.client_name || '',
+          contact_email: clientData.contact_email || clientData.email || '',
+          website: clientData.website || '',
+          industry: clientData.industry || '',
+          customer_type: clientData.customer_type || 'Direct Customer',
+          gst_tax_id: clientData.gst_tax_id || clientData.tax_id || '',
+          client_status: clientData.status === 'active' || clientData.client_status === 'Active' ? 'Active' : 'Inactive',
+          notes: clientData.notes || '',
+          account_owner: clientData.account_owner || clientData.user_id || '',
+          addresses: clientData.addresses && clientData.addresses.length > 0 
+            ? clientData.addresses.map(addr => ({
+                address_line1: addr.address_line1 || '',
+                address_line2: addr.address_line2 || '',
+                city: addr.city || '',
+                region: addr.region_state || '',
+                country: addr.country || '',
+                postal_code: addr.postal_code || '',
+                is_primary: addr.is_primary || false
+              }))
+            : [{ address_line1: '', country: '', region: '', is_primary: true }],
+          contact_persons: clientData.contacts && clientData.contacts.length > 0
+            ? clientData.contacts.map(contact => ({
+                name: contact.name || '',
+                email: contact.email || '',
+                phone: contact.phone || '',
+                position: contact.position || '',
+                is_primary: contact.is_primary || false
+              }))
+            : [{ name: '', email: '', phone: '', position: '', is_primary: false }]
+        };
+        
+        setViewingClient(formData);
+        setIsViewMode(true);
+        setShowForm(true);
+      }
+    } catch (error) {
+      console.error('Error fetching client details (view):', error);
+      toast.error('Failed to load client details');
+    }
+  };
+
   const handleEdit = async (client, e) => {
     if (e && typeof e.stopPropagation === 'function') {
       e.stopPropagation();
     }
     
     try {
-      console.log('Client object:', client);
+      console.log('Client object (edit):', client);
       const clientId = client.id || client._id || client.client_id;
       if (!clientId) {
         throw new Error('Client ID not found');
       }
-      console.log('Using client ID:', clientId);
+      console.log('Using client ID (edit):', clientId);
       const response = await clientService.getClientById(clientId);
-      console.log('API Response:', response);
+      console.log('API Response (edit):', response);
       
       if (response) {
         const clientData = response.data || response;
-        console.log('Client data:', clientData);
+        console.log('Client data (edit):', clientData);
         
         const formData = {
           id: clientData.id || clientData._id || clientData.client_id,
@@ -193,10 +257,11 @@ const Clients = () => {
         };
         
         setEditingClient(formData);
+        setIsViewMode(false);
         setShowForm(true);
       }
     } catch (error) {
-      console.error('Error fetching client details:', error);
+      console.error('Error fetching client details (edit):', error);
       toast.error('Failed to load client details');
     }
   };
@@ -204,6 +269,8 @@ const Clients = () => {
   const handleFormClose = (shouldRefresh = false) => {
     setShowForm(false);
     setEditingClient(null);
+    setViewingClient(null);
+    setIsViewMode(false);
     if (shouldRefresh) {
       fetchClients();
     }
@@ -513,11 +580,13 @@ const Clients = () => {
         <DataTable
           data={filteredClients}
           columns={columns}
+          onView={handleView}
           onEdit={(client) => handleEdit(client)}
           onDelete={handleDelete}
           testId="clients-table"
           loading={loading}
           hideAddButton={true}
+          viewButtonClass="h-8 w-8 p-0 text-gray-600 hover:text-gray-800"
           editButtonClass="h-8 w-8 p-0 text-blue-600 hover:text-blue-800"
           deleteButtonClass="h-8 w-8 p-0 text-red-600 hover:text-red-800"
         />
@@ -526,7 +595,8 @@ const Clients = () => {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
           <ClientForm
-            client={editingClient}
+            client={isViewMode ? viewingClient : editingClient}
+            viewMode={isViewMode}
             onSuccess={() => {
               fetchClients();
               setShowForm(false);
