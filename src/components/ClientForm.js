@@ -85,30 +85,43 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
 
   // Fetch users and regions on component mount
   useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        // Fetch users
-        const usersResponse = await getUsers();
-        const usersData = Array.isArray(usersResponse?.data) ? usersResponse.data : [];
-        setUsers(usersData);
+  const fetchInitialData = async () => {
+    try {
+      // Fetch users
+      const usersResponse = await getUsers();
+      const usersData = Array.isArray(usersResponse?.data) ? usersResponse.data : [];
+      setUsers(usersData);
 
-        // Fetch regions with countries
-        const response = await masterDataService.getRegionsWithCountries();
-        console.log('Regions data response:', response); // Debug log
-        // Check if response has a data property and it's an array
-        const regionsData = response?.data || [];
-        console.log('Processed regions data:', regionsData); // Debug log
-        setRegions(regionsData);
-      } catch (error) {
-        console.error('Error fetching initial data:', error);
-        toast.error('Failed to load required data');
-        setUsers([]);
-        setRegions([]);
+      // If in view mode and we have an account_owner string but no ID, try to find the user
+      if (viewMode && client && typeof client.account_owner === 'string' && !client.user_id) {
+        const ownerUser = usersData.find(u => 
+          u.name === client.account_owner || 
+          u.username === client.account_owner ||
+          u.email === client.account_owner
+        );
+        if (ownerUser) {
+          setFormData(prev => ({
+            ...prev,
+            account_owner: ownerUser.id
+          }));
+        }
       }
-    };
 
-    fetchInitialData();
-  }, []);
+      // Fetch regions with countries
+      const response = await masterDataService.getRegionsWithCountries();
+      console.log('Regions data response:', response);
+      const regionsData = response?.data || [];
+      setRegions(regionsData);
+    } catch (error) {
+      console.error('Error fetching initial data:', error);
+      toast.error('Failed to load required data');
+      setUsers([]);
+      setRegions([]);
+    }
+  };
+
+  fetchInitialData();
+}, [viewMode, client]);
 
   // Debug effect to log formData.industry and client prop
   useEffect(() => {
@@ -118,37 +131,68 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
 
   useEffect(() => {
     if (client) {
-      // Parse contact persons to extract country codes
-      const parsedContacts = client.contact_persons?.map(contact => {
-        const { countryCode, number } = parsePhoneNumber(contact.phone || '');
-        return {
-          ...contact,
-          phone: number,
-          countryCode: countryCode || '+1'
-        };
-      }) || [];
+      console.log('Client data in form:', client);
+      
+      // Find the user ID that matches the account_owner name if account_owner is a string
+      const getAccountOwnerId = () => {
+        if (typeof client.account_owner === 'string') {
+          const ownerUser = users.find(u => 
+            u.name === client.account_owner || 
+            u.username === client.account_owner ||
+            u.email === client.account_owner
+          );
+          return ownerUser?.id || client.account_owner;
+        }
+        return client.account_owner || '';
+      };
 
-      const initialData = {
-        client_name: client.client_name || '',
-        contact_email: client.contact_email || '',
-        website: client.website || '',
-        industry: client.industry || '',
-        customer_type: client.customer_type || 'Partner',
-        gst_tax_id: client.gst_tax_id || '',
-        addresses: client.addresses && client.addresses.length > 0
-          ? client.addresses
-          : [{ address_line1: '', country: '', region: '', is_primary: true }],
-        account_owner: client.account_owner || '',
-        client_status: client.client_status || 'Active',
-        notes: client.notes || '',
-        contact_persons: parsedContacts.length ? parsedContacts : [{
+      // Process contacts from either client.contacts or client.contact_persons
+      const processContacts = () => {
+        const contacts = client.contacts || client.contact_persons || [];
+        console.log('Processing contacts:', contacts);
+        
+        if (contacts.length > 0) {
+          return contacts.map(contact => {
+            const { countryCode, number } = parsePhoneNumber(contact.phone || '');
+            return {
+              ...contact,
+              name: contact.name || '',
+              email: contact.email || '',
+              phone: number || '',
+              countryCode: countryCode || '+1',
+              designation: contact.designation || contact.position || '',
+              is_primary: contact.is_primary || false
+            };
+          });
+        }
+        
+        return [{
           name: '',
           email: '',
           phone: '',
           countryCode: '+1',
           designation: '',
           is_primary: false
-        }]
+        }];
+      };
+
+      const initialData = {
+        client_name: client.client_name || '',
+        contact_email: client.email || client.contact_email || '',
+        website: client.website || '',
+        industry: client.industry || '',
+        customer_type: client.customer_type || 'Partner',
+        gst_tax_id: client.tax_id || client.gst_tax_id || '',
+        addresses: client.addresses && client.addresses.length > 0
+          ? client.addresses.map(addr => ({
+              ...addr,
+              region: addr.region_state || addr.region || ''
+            }))
+          : [{ address_line1: '', country: '', region: '', is_primary: true }],
+        account_owner: getAccountOwnerId(),
+        client_status: client.status === 'active' ? 'Active' : (client.client_status || 'Active'),
+        notes: client.notes || '',
+        contact_persons: processContacts()
       };
       console.log('Initial data:', initialData);
 
