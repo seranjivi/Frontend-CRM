@@ -1312,7 +1312,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   {/* Q&A Logs */}
                   <div className="md:col-span-2 -mt-2">
                     <div className="mb-2">
-                      <Label>Q&A</Label>
+                      <Label>Q&A </Label>
                       <div className="flex flex-col space-y-2 w-full">
                         <div className="flex flex-col space-y-2 w-full">
                           <Textarea
