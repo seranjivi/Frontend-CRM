@@ -677,7 +677,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
             value="rfp"
             disabled={showOnlyDetails || showOnlySOW}
           >
-            RFP Details
+            Opportunity-RFP
           </TabsTrigger>
           <TabsTrigger
             value="sow"
@@ -1152,7 +1152,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           <TabsContent value="rfp" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Opportunity/RFP Details</CardTitle>
+                <CardTitle>Opportunity-RFP Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1193,7 +1193,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   </div>
                   {/* RFP Status */}
                   <div>
-                    <Label htmlFor="rfbDescription">RFB Description</Label>
+                    <Label htmlFor="rfbDescription">RFP Description</Label>
                     <Textarea
                       id="rfbDescription"
                       value={formData.rfpDetails.rfbDescription || ''}
@@ -1312,7 +1312,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   {/* Q&A Logs */}
                   <div className="md:col-span-2 -mt-2">
                     <div className="mb-2">
-                      <Label>Q&A Log</Label>
+                      <Label>Q&A</Label>
                       <div className="flex flex-col space-y-2 w-full">
                         <div className="flex flex-col space-y-2 w-full">
                           <Textarea
@@ -1463,7 +1463,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
             {/* RFP Documents */}
             <Card>
               <CardHeader>
-                <CardTitle>RFP Documents</CardTitle>
+                <CardTitle>Documents</CardTitle>
               </CardHeader>
               <CardContent>
                 <MultiFileUpload
@@ -1616,7 +1616,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
               ) : (
                 <>
                   {activeTab === 'sow' ? 'Add SOW' :
-                    activeTab === 'rfp' ? 'Add RFB' :
+                    activeTab === 'rfp' ? 'Add' :
                       (opportunity ? 'Update' : 'Create')}
                 </>
               )}

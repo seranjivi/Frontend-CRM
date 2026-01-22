@@ -427,7 +427,7 @@ const Opportunities = () => {
 
         const isLevel1 = currentStage === APPROVAL_STAGES.LEVEL_1_RFB;
         const buttonText = isLevel1 
-          ? 'Level 1 Approval - RFB' 
+          ? 'Level 1 Approval - RFP' 
           : 'Level 2 Approval - SOW';
         
         const buttonClass = isLevel1 
@@ -627,7 +627,7 @@ const Opportunities = () => {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {showOnlySOW ? 'SOW Details' : isRFPView ? 'RFP Details' : editingOpportunity ? 'Edit Lead' : 'Add New Lead'}
+              {showOnlySOW ? 'SOW Details' : isRFPView ? 'Opportunity-RFP' : editingOpportunity ? 'Edit Lead' : 'Add New Lead'}
             </DialogTitle>
           </DialogHeader>
           <OpportunityFormTabbed 
