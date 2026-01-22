@@ -18,7 +18,6 @@ const countryCodes = [
   { code: 'US', name: 'United States', dialCode: '+1' },
   { code: 'IN', name: 'India', dialCode: '+91' },
   { code: 'GB', name: 'UK', dialCode: '+44' },
-  { code: 'CA', name: 'Canada', dialCode: '+1' },
   { code: 'AU', name: 'Australia', dialCode: '+61' },
   { code: 'DE', name: 'Germany', dialCode: '+49' },
   { code: 'FR', name: 'France', dialCode: '+33' },
@@ -62,43 +61,67 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
   const parsePhoneNumber = (phoneNumber) => {
     if (!phoneNumber) return { countryCode: '+1', number: '' };
     
-    // Match country code (starts with + followed by digits)
-    const match = phoneNumber.match(/^(\+\d+)(\d+)$/);
-    if (match) {
+    // Handle cases where the number might be in format "+971-678899" or "+971678899"
+    const cleanNumber = phoneNumber.replace(/[\s-]/g, '');
+    
+    // Find the country code that matches the start of the phone number
+    const countryCodeMatch = countryCodes.find(({ dialCode }) => 
+      cleanNumber.startsWith(dialCode)
+    );
+
+    if (countryCodeMatch) {
       return {
-        countryCode: match[1],
-        number: match[2]
+        countryCode: countryCodeMatch.dialCode,
+        number: cleanNumber.substring(countryCodeMatch.dialCode.length)
       };
     }
-    return { countryCode: '+1', number: phoneNumber };
+    
+    // If no matching country code found, default to +1
+    return { 
+      countryCode: '+1', 
+      number: cleanNumber.startsWith('+') ? cleanNumber.substring(1) : cleanNumber 
+    };
   };
 
   // Fetch users and regions on component mount
   useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        // Fetch users
-        const usersResponse = await getUsers();
-        const usersData = Array.isArray(usersResponse?.data) ? usersResponse.data : [];
-        setUsers(usersData);
+  const fetchInitialData = async () => {
+    try {
+      // Fetch users
+      const usersResponse = await getUsers();
+      const usersData = Array.isArray(usersResponse?.data) ? usersResponse.data : [];
+      setUsers(usersData);
 
-        // Fetch regions with countries
-        const response = await masterDataService.getRegionsWithCountries();
-        console.log('Regions data response:', response); // Debug log
-        // Check if response has a data property and it's an array
-        const regionsData = response?.data || [];
-        console.log('Processed regions data:', regionsData); // Debug log
-        setRegions(regionsData);
-      } catch (error) {
-        console.error('Error fetching initial data:', error);
-        toast.error('Failed to load required data');
-        setUsers([]);
-        setRegions([]);
+      // If in view mode and we have an account_owner string but no ID, try to find the user
+      if (viewMode && client && typeof client.account_owner === 'string' && !client.user_id) {
+        const ownerUser = usersData.find(u => 
+          u.name === client.account_owner || 
+          u.username === client.account_owner ||
+          u.email === client.account_owner
+        );
+        if (ownerUser) {
+          setFormData(prev => ({
+            ...prev,
+            account_owner: ownerUser.id
+          }));
+        }
       }
-    };
 
-    fetchInitialData();
-  }, []);
+      // Fetch regions with countries
+      const response = await masterDataService.getRegionsWithCountries();
+      console.log('Regions data response:', response);
+      const regionsData = response?.data || [];
+      setRegions(regionsData);
+    } catch (error) {
+      console.error('Error fetching initial data:', error);
+      toast.error('Failed to load required data');
+      setUsers([]);
+      setRegions([]);
+    }
+  };
+
+  fetchInitialData();
+}, [viewMode, client]);
 
   // Debug effect to log formData.industry and client prop
   useEffect(() => {
@@ -108,37 +131,68 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
 
   useEffect(() => {
     if (client) {
-      // Parse contact persons to extract country codes
-      const parsedContacts = client.contact_persons?.map(contact => {
-        const { countryCode, number } = parsePhoneNumber(contact.phone || '');
-        return {
-          ...contact,
-          phone: number,
-          countryCode: countryCode || '+1'
-        };
-      }) || [];
+      console.log('Client data in form:', client);
+      
+      // Find the user ID that matches the account_owner name if account_owner is a string
+      const getAccountOwnerId = () => {
+        if (typeof client.account_owner === 'string') {
+          const ownerUser = users.find(u => 
+            u.name === client.account_owner || 
+            u.username === client.account_owner ||
+            u.email === client.account_owner
+          );
+          return ownerUser?.id || client.account_owner;
+        }
+        return client.account_owner || '';
+      };
 
-      const initialData = {
-        client_name: client.client_name || '',
-        contact_email: client.contact_email || '',
-        website: client.website || '',
-        industry: client.industry || '',
-        customer_type: client.customer_type || 'Partner',
-        gst_tax_id: client.gst_tax_id || '',
-        addresses: client.addresses && client.addresses.length > 0
-          ? client.addresses
-          : [{ address_line1: '', country: '', region: '', is_primary: true }],
-        account_owner: client.account_owner || '',
-        client_status: client.client_status || 'Active',
-        notes: client.notes || '',
-        contact_persons: parsedContacts.length ? parsedContacts : [{
+      // Process contacts from either client.contacts or client.contact_persons
+      const processContacts = () => {
+        const contacts = client.contacts || client.contact_persons || [];
+        console.log('Processing contacts:', contacts);
+        
+        if (contacts.length > 0) {
+          return contacts.map(contact => {
+            const { countryCode, number } = parsePhoneNumber(contact.phone || '');
+            return {
+              ...contact,
+              name: contact.name || '',
+              email: contact.email || '',
+              phone: number || '',
+              countryCode: countryCode || '+1',
+              designation: contact.designation || contact.position || '',
+              is_primary: contact.is_primary || false
+            };
+          });
+        }
+        
+        return [{
           name: '',
           email: '',
           phone: '',
           countryCode: '+1',
           designation: '',
           is_primary: false
-        }]
+        }];
+      };
+
+      const initialData = {
+        client_name: client.client_name || '',
+        contact_email: client.email || client.contact_email || '',
+        website: client.website || '',
+        industry: client.industry || '',
+        customer_type: client.customer_type || 'Partner',
+        gst_tax_id: client.tax_id || client.gst_tax_id || '',
+        addresses: client.addresses && client.addresses.length > 0
+          ? client.addresses.map(addr => ({
+              ...addr,
+              region: addr.region_state || addr.region || ''
+            }))
+          : [{ address_line1: '', country: '', region: '', is_primary: true }],
+        account_owner: getAccountOwnerId(),
+        client_status: client.status === 'active' ? 'Active' : (client.client_status || 'Active'),
+        notes: client.notes || '',
+        contact_persons: processContacts()
       };
       console.log('Initial data:', initialData);
 
@@ -219,6 +273,14 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
     }
 
     setFormData(prev => ({ ...prev, contact_persons: updatedContacts }));
+    
+    // Clear any phone-related errors when the field changes
+    if (field === 'phone' || field === 'countryCode') {
+      setErrors(prev => ({
+        ...prev,
+        [`contact_persons[${index}].phone`]: undefined
+      }));
+    }
   };
 
   const handleRegionChange = async (index, regionId) => {
@@ -656,18 +718,22 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
                   <Label htmlFor={`contact_phone_${index}`}>Phone</Label>
                   <div className="flex gap-1">
                     <div className="relative">
-                      <select
+                      <Select
                         value={contact.countryCode || '+1'}
-                        onChange={(e) => handleContactChange(index, 'countryCode', e.target.value)}
-                        className={`h-10 w-10 rounded-md border border-input bg-background px-0.5 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 appearance-none ${viewMode ? 'bg-gray-100' : ''}`}
+                        onValueChange={(value) => handleContactChange(index, 'countryCode', value)}
                         disabled={viewMode}
                       >
-                        {countryCodes.map((country) => (
-                          <option key={country.code} value={country.dialCode}>
-                            {country.dialCode}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger className={`h-10 w-[60px] ${viewMode ? 'bg-gray-100' : ''} px-1`}>
+                          <SelectValue placeholder="+1" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {countryCodes.map((country) => (
+                            <SelectItem key={country.code} value={country.dialCode}>
+                              {country.dialCode}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="flex-1">
                       <Input
@@ -677,7 +743,7 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
                         onChange={(e) => handleContactChange(index, 'phone', e.target.value)}
                         placeholder="123 456 7890"
                         data-testid={`contact-phone-${index}`}
-                        className={`h-10 w-40 ${viewMode ? 'bg-gray-100' : ''}`}
+                        className={`h-10 w-full ${viewMode ? 'bg-gray-100' : ''} -ml-px`}
                         disabled={viewMode}
                       />
                     </div>
