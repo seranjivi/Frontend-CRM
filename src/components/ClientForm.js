@@ -903,29 +903,46 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
             <div className="space-y-2">
               <Label htmlFor="account_owner">Account Owner <span className="text-red-500">*</span></Label>
               <div className="relative">
-                <Select
-                  value={formData.account_owner ? String(formData.account_owner) : ''}
-                  onValueChange={(value) => {
-                    if (viewMode) return;
-                    setFormData(prev => ({ ...prev, account_owner: value }));
-                    if (errors.account_owner) {
-                      setErrors(prev => ({ ...prev, account_owner: '' }));
-                    }
-                  }}
-                  disabled={viewMode}
-                >
-                  <SelectTrigger className={errors.account_owner ? 'border-red-500' : ''}>
-                    <SelectValue placeholder="Select account owner..." />
-                  </SelectTrigger>
-
-                  <SelectContent>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={String(user.id)}>
-                        {user.full_name || user.email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {viewMode ? (
+                  <Input
+                    type="text"
+                    value={formData.account_owner || ''}
+                    readOnly
+                    className="bg-gray-100"
+                  />
+                ) : (
+                  <Select
+                    value={formData.account_owner ? String(formData.account_owner) : ''}
+                    onValueChange={(value) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        account_owner: value === 'custom' ? '' : value,
+                        account_owner_name: value === 'custom' ? '' : users.find(u => String(u.id) === value)?.full_name || ''
+                      }));
+                      if (errors.account_owner) {
+                        setErrors(prev => ({ ...prev, account_owner: '' }));
+                      }
+                    }}
+                  >
+                    <SelectTrigger className={errors.account_owner ? 'border-red-500' : ''}>
+                      <SelectValue placeholder="Select account owner...">
+                        {users.find(u => String(u.id) === String(formData.account_owner))?.full_name || formData.account_owner || ''}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map((user) => (
+                        <SelectItem key={user.id} value={String(user.id)}>
+                          {user.full_name || user.email}
+                        </SelectItem>
+                      ))}
+                      {formData.account_owner && !users.some(u => String(u.id) === String(formData.account_owner)) && (
+                        <SelectItem value={formData.account_owner}>
+                          {formData.account_owner}
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
 
               </div>
               {errors.account_owner && (
