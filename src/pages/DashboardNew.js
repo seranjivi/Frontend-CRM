@@ -4,10 +4,11 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Utils } from 'recharts';
 import { Users, Target, DollarSign, FolderOpen, Filter, Calendar, ChevronDown } from 'lucide-react';
 import opportunityService from '../services/opportunityService';
+import api from '../utils/api';
 
 const Dashboard = () => {
   // State for filters
@@ -34,9 +35,35 @@ const Dashboard = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch opportunities from API
-        const response = await opportunityService.getOpportunities();
-        const opportunities = response.data || [];
+        // Use Promise.allSettled to run requests in parallel and handle failures independently
+        const [opportunitiesResult, leadsResult] = await Promise.allSettled([
+          opportunityService.getOpportunities(),
+          api.get('/leads')
+        ]);
+
+        // Process Opportunities
+        let opportunities = [];
+        if (opportunitiesResult.status === 'fulfilled') {
+          opportunities = opportunitiesResult.value.data || [];
+        } else {
+          console.error('Error fetching opportunities:', opportunitiesResult.reason);
+        }
+
+        // Process Leads
+        let leadsData = [];
+        if (leadsResult.status === 'fulfilled') {
+          const response = leadsResult.value;
+          if (response.data && Array.isArray(response.data)) {
+            leadsData = response.data;
+          } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+            leadsData = response.data.data;
+          } else if (response.data && response.data.success && Array.isArray(response.data.data)) {
+            // Corrected access path if needed, but usually response.data is the body
+            leadsData = response.data.data;
+          }
+        } else {
+          console.error('Error fetching leads:', leadsResult.reason);
+        }
 
         // Calculate counts for specified pipeline stages
         const stageCounts = {
@@ -64,21 +91,8 @@ const Dashboard = () => {
 
         setFunnelData(newFunnelData);
 
-        // Update KPI data with real opportunities count
-        const totalOpportunities = opportunities.length;
-        // Calculate other KPIs if possible or keep mock for now
-        setKpiData(prev => ({
-          ...prev,
-          leads: { count: 1250, change: 12.5 }, // Keep mock
-          opportunities: { value: opportunities.reduce((sum, opp) => sum + (Number(opp.amount) || 0), 0), count: totalOpportunities, change: 8.2 },
-          sales: { count: stageCounts['Won'], change: 5.7 },
-          projects: { count: 36, change: 2.3 } // Keep mock
-        }));
-
-        // Calculate counts for lead sources
+        // Calculate counts for lead sources (Chart Data) - using Opportunities as per previous logic (or could switch to leads if requested, but staying consistent)
         const sourceCounts = {};
-        // Initialize with 0 for known sources to ensure they appear (optional, or just count existing)
-        // User requested specific list, let's track all of them:
         const leadSources = [
           'Advertisement', 'Cold Call', 'Employee Referral', 'External Referral',
           'Online Store', 'Partner Organization', 'Partner Individual', 'Public Relations',
@@ -88,20 +102,19 @@ const Dashboard = () => {
 
         leadSources.forEach(source => sourceCounts[source] = 0);
 
+        // Note: We are using 'opportunities' for Source Distribution as it was before.
+        // If the user meant "Leads Source Distribution" (from Leads table), that would be a different change.
+        // Given the request was "Source Distribution widget... remove those...", it implies the existing widget.
         opportunities.forEach(opp => {
           const source = opp.lead_source || 'Others';
-          // Normalize source if needed, or just count exact matches
-          // Check if source exists in our list, if not maybe map to Others or just add it
           const matchedSource = leadSources.find(s => s.toLowerCase() === source.toLowerCase()) || 'Others';
           if (sourceCounts.hasOwnProperty(matchedSource)) {
             sourceCounts[matchedSource]++;
           } else {
-            // Handle unexpected sources if any, map to Others
             sourceCounts['Others']++;
           }
         });
 
-        // Color palette for sources
         const sourceColors = {
           'Advertisement': '#3b82f6',
           'Cold Call': '#10b981',
@@ -129,8 +142,27 @@ const Dashboard = () => {
         })).filter(item => item.value > 0).sort((a, b) => b.value - a.value);
 
         setSourceData(newSourceData);
+
+
+        // KPI Calculations using LEADS data
+        const totalLeadsCount = leadsData.length;
+        const totalLeadsValue = leadsData.reduce((sum, lead) => {
+          // Handle different casing or missing values
+          const val = parseFloat(lead.estimated_deal_value || lead.amount || 0);
+          return sum + (isNaN(val) ? 0 : val);
+        }, 0);
+
+        setKpiData(prev => ({
+          ...prev,
+          leads: { count: totalLeadsCount, change: 0 },
+          opportunities: { value: totalLeadsValue, count: totalLeadsCount, change: 0 }, // Using Lead Value for Opportunities KPI as requested
+          sales: { count: stageCounts['Won'], change: 5.7 },
+          projects: { count: 36, change: 2.3 } // Keep mock
+        }));
+
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        // This catch block will now only run if something unexpected happens OUTSIDE the API calls execution (like logic error)
+        console.error('Error in dashboard data processing:', error);
       } finally {
         setLoading(false);
       }
@@ -395,19 +427,16 @@ const Dashboard = () => {
                     }}
                     cursor={{ fill: 'rgba(0, 0, 0, 0.02)' }}
                   />
-                  {sourceData.map((entry, index) => (
-                    <Bar
-                      key={`bar-${index}`}
-                      dataKey="value"
-                      name={entry.name}
-                      data={[entry]}
-                      fill={entry.color}
-                      radius={[0, 4, 4, 0]}
-                      animationBegin={index * 100}
-                      animationDuration={800}
-                      animationEasing="ease-out"
-                    />
-                  ))}
+                  <Bar
+                    dataKey="value"
+                    radius={[0, 4, 4, 0]}
+                    animationDuration={800}
+                    animationEasing="ease-out"
+                  >
+                    {sourceData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
