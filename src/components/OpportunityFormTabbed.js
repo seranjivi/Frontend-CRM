@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import opportunityService from '../services/opportunityService';
 import rfpService from '../services/rfpService';
 import clientService from '../services/clientService';
@@ -47,6 +47,20 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   const [newQaQuestion, setNewQaQuestion] = useState('');
   const [clients, setClients] = useState([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [visibleClients, setVisibleClients] = useState(10);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Filter clients based on search term
+  const filteredClients = useMemo(() => {
+    if (!searchTerm) return clients;
+    const term = searchTerm.toLowerCase();
+    return clients.filter(client => 
+      client.client_name?.toLowerCase().includes(term) ||
+      client.email?.toLowerCase().includes(term) ||
+      client.phone?.toLowerCase().includes(term)
+    );
+  }, [clients, searchTerm]);
 
   const LEAD_SOURCES = [
     'Advertisement', 'Cold Call', 'Employee Referral', 'External Referral',
@@ -711,23 +725,60 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
 
                   <div>
                     <Label htmlFor="client">Client <span className="text-red-600">*</span></Label>
-                    <select
-                      id="client"
+                    <Select
                       value={formData.opportunity.client_name || ''}
-                      onChange={handleClientSelect}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      onValueChange={(value) => {
+                        if (value === 'add_new') {
+                          window.location.href = '/clients';
+                          return;
+                        }
+                        const client = clients.find(c => c.client_name === value);
+                        if (client) {
+                          handleClientSelect({ target: { value: client.client_name } });
+                        }
+                      }}
                       disabled={isLoadingClients}
                       required
                     >
-                      <option value="">
-                        {isLoadingClients ? 'Loading clients...' : 'Select a client...'}
-                      </option>
-                      {clients.map((client) => (
-                        <option key={client.id} value={client.client_name}>
-                          {client.client_name}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={isLoadingClients ? 'Loading clients...' : 'Select a client...'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <div className="px-3 py-2">
+                          <input
+                            type="text"
+                            placeholder="Search clients..."
+                            className="w-full p-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            value={searchTerm}
+                          />
+                        </div>
+                        <div 
+                          className="max-h-60 overflow-y-auto" 
+                          onScroll={(e) => {
+                            const { scrollTop, scrollHeight, clientHeight } = e.target;
+                            if (scrollHeight - scrollTop === clientHeight && !isLoadingMore) {
+                              setVisibleClients(prev => Math.min(prev + 10, filteredClients.length));
+                            }
+                          }}
+                        >
+                          <SelectItem value="add_new" className="font-medium text-blue-600 bg-blue-50">
+                            + Add New Client
+                          </SelectItem>
+                          {filteredClients.slice(0, visibleClients).map((client) => (
+                            <SelectItem key={client.id} value={client.client_name}>
+                              {client.client_name}
+                            </SelectItem>
+                          ))}
+                          {filteredClients.length === 0 && (
+                            <div className="px-2 py-1.5 text-sm text-gray-500">
+                              {searchTerm ? 'No matching clients found' : 'No clients available'}
+                            </div>
+                          )}
+                        </div>
+                      </SelectContent>
+                    </Select>
                     {formErrors.client_name && (
                       <p className="mt-1 text-sm text-red-600">{formErrors.client_name}</p>
                     )}

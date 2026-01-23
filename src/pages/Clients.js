@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useInView } from 'react-intersection-observer';
 import { Plus, Download, X, Search, Upload } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import ClientForm from '../components/ClientForm';
@@ -9,6 +10,7 @@ import { Button } from '../components/ui/button';
 import ImportCSVModal from '../components/ImportCSVModal';
 import clientService from '../services/clientService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Input } from '../components/ui/input';
 
 const Clients = () => {
   const [clients, setClients] = useState([]);
@@ -20,9 +22,16 @@ const Clients = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isViewMode, setIsViewMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [clientNames, setClientNames] = useState([]);
+  const [visibleCount, setVisibleCount] = useState(10);
+  const [loadMoreRef, inView] = useInView({
+    threshold: 0.1,
+    triggerOnce: false
+  });
   const [filters, setFilters] = useState({
     region: '',
-    client_status: '',
+    status: '',
     client_tier: '',
     date_range: 'all',
     search: '',
@@ -33,11 +42,9 @@ const Clients = () => {
   // Get unique values for filters
   const filterOptions = {
     region: [...new Set(clients.map(client => client.region).filter(Boolean))],
-    client_status: ['Active', 'Inactive', 'Prospect'],
+    status: ['All Status', 'Active', 'Inactive'],
     client_tier: ['A', 'B', 'C', 'D']
   };
-
-  const statusOptions = ['All Status', 'Active', 'Inactive'];
 
   // Filter clients based on all active filters
   const filteredClients = clients.filter(client => {
@@ -69,20 +76,24 @@ const Clients = () => {
         dateInRange = true;
     }
 
-    // Client name filter (case-insensitive search)
+    // Search across multiple fields (case-insensitive)
     const matchesSearch = !filters.search || 
-      (client.client_name && client.client_name.toLowerCase().includes(filters.search.toLowerCase()));
+      (client.client_name && client.client_name.toLowerCase().includes(filters.search.toLowerCase())) ||
+      (client.client_id && client.client_id.toString().toLowerCase().includes(filters.search.toLowerCase())) ||
+      (client.industry && client.industry.toLowerCase().includes(filters.search.toLowerCase())) ||
+      (client.customer_type && client.customer_type.toLowerCase().includes(filters.search.toLowerCase()));
 
     // Client name dropdown filter (exact match)
     const matchesClientName = !filters.client_name || 
       (client.client_name && client.client_name === filters.client_name);
 
-    // Status filter
-    const matchesStatus = !filters.client_status || 
-      filters.client_status === '' ||
-      filters.client_status === 'All Status' ||
-      (filters.client_status === 'Active' && client.client_status === 'Active') ||
-      (filters.client_status === 'Inactive' && (!client.client_status || client.client_status === 'Inactive'));
+    // Status filter (case-insensitive and flexible with status values)
+    const clientStatus = String(client.status || client.client_status || '').toLowerCase();
+    const matchesStatus = !filters.status || 
+      filters.status === '' ||
+      filters.status === 'All Status' ||
+      (filters.status === 'Active' && clientStatus !== 'inactive') ||
+      (filters.status === 'Inactive' && clientStatus === 'inactive');
 
     return (
       matchesSearch &&
@@ -104,15 +115,45 @@ const Clients = () => {
   const clearFilters = () => {
     setFilters({
       region: '',
-      client_status: '',
+      status: '',
       client_tier: '',
-      date_range: 'all'
+      date_range: 'all',
+      search: '',
+      client_name: ''
     });
   };
 
   useEffect(() => {
     fetchClients();
   }, []);
+
+  useEffect(() => {
+    if (clients.length > 0) {
+      const names = [...new Set(clients.map(c => c.client_name).filter(Boolean))];
+      setClientNames(names);
+    }
+  }, [clients]);
+
+  // Load more items when scrolled to bottom
+  useEffect(() => {
+    if (inView) {
+      setVisibleCount(prev => prev + 10);
+    }
+  }, [inView]);
+
+  // Reset visible count when search query changes
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [searchQuery]);
+
+  // Filter clients based on search query
+  const filteredClientNames = useMemo(() => {
+    return clientNames
+      .filter(name => 
+        name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      .slice(0, visibleCount);
+  }, [clientNames, searchQuery, visibleCount]);
 
   const fetchClients = async () => {
     try {
@@ -527,27 +568,51 @@ const Clients = () => {
                 value={filters.search || ''}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
               />
-              {filters.search && (
-                <X
-                  className="absolute right-2.5 h-4 w-4 text-muted-foreground cursor-pointer"
-                  onClick={() => handleFilterChange('search', '')}
-                />
-              )}
+              {/* {filters.search && (
+                // <X
+                //   className="absolute right-2.5 h-4 w-4 text-muted-foreground cursor-pointer"
+                //   onClick={() => handleFilterChange('search', '')}
+                // />
+              )} */}
             </div>
             <Select 
               value={filters.client_name || ''}
-              onValueChange={(value) => handleFilterChange('client_name', value === 'All Clients' ? '' : value)}
+              onValueChange={(value) => {
+                handleFilterChange('client_name', value === 'All Clients' ? '' : value);
+                setSearchQuery(''); // Reset search when an item is selected
+              }}
             >
-              <SelectTrigger className="w-[150px] h-9 text-sm">
+              <SelectTrigger className="w-[200px] h-9 text-sm">
                 <SelectValue placeholder="Client Name" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All Clients">All Clients</SelectItem>
-                {Array.from(new Set(clients.map(c => c.client_name).filter(Boolean))).map((name) => (
-                  <SelectItem key={name} value={name}>
-                    {name}
-                  </SelectItem>
-                ))}
+              <SelectContent className="p-0 w-[var(--radix-select-trigger-width)]">
+                <div className="sticky top-0 bg-white p-2 border-b">
+                  <Input
+                    placeholder="Search client..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-8 text-sm w-full"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+                <div className="max-h-[300px] overflow-y-auto">
+                  <SelectItem value="All Clients">All Clients</SelectItem>
+                  {filteredClientNames.map((name, index) => (
+                    <SelectItem 
+                      key={name} 
+                      value={name}
+                      ref={index === filteredClientNames.length - 1 ? loadMoreRef : null}
+                    >
+                      {name}
+                    </SelectItem>
+                  ))}
+                  {filteredClientNames.length === 0 && (
+                    <div className="py-2 text-center text-sm text-gray-500">
+                      No clients found
+                    </div>
+                  )}
+                  <div ref={loadMoreRef} className="h-4 w-full" />
+                </div>
               </SelectContent>
             </Select>
             <Select 
@@ -558,7 +623,7 @@ const Clients = () => {
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
-                {statusOptions.map((status) => (
+                {filterOptions.status.map((status) => (
                   <SelectItem key={status} value={status}>
                     {status}
                   </SelectItem>
@@ -636,7 +701,7 @@ const Clients = () => {
       )}
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0" hideCloseButton={true}>
           <ClientForm
             client={isViewMode ? viewingClient : editingClient}
             viewMode={isViewMode}

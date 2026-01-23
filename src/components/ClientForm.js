@@ -956,12 +956,21 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
               <Label htmlFor="account_owner">Account Owner <span className="text-red-500">*</span></Label>
               <div className="relative">
                 {viewMode ? (
-                  <Input
-                    type="text"
-                    value={formData.account_owner || ''}
-                    readOnly
-                    className="bg-gray-100"
-                  />
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      value={
+                        // Find the user name by matching the account_owner ID with users list
+                        users.find(u => String(u.id) === String(formData.account_owner))?.full_name || 
+                        users.find(u => String(u.id) === String(formData.account_owner))?.name ||
+                        users.find(u => String(u.id) === String(formData.account_owner))?.username ||
+                        users.find(u => String(u.id) === String(formData.account_owner))?.email ||
+                        formData.account_owner || ''
+                      }
+                      readOnly
+                      className="bg-gray-100"
+                    />
+                  </div>
                 ) : (
                   <Select
                     value={formData.account_owner ? String(formData.account_owner) : ''}
@@ -995,7 +1004,6 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
                     </SelectContent>
                   </Select>
                 )}
-
               </div>
               {errors.account_owner && (
                 <p className="text-red-500 text-sm mt-1">{errors.account_owner}</p>
