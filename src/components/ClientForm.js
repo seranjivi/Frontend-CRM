@@ -85,43 +85,28 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
 
   // Fetch users and regions on component mount
   useEffect(() => {
-  const fetchInitialData = async () => {
-    try {
-      // Fetch users
-      const usersResponse = await getUsers();
-      const usersData = Array.isArray(usersResponse?.data) ? usersResponse.data : [];
-      setUsers(usersData);
+    const fetchInitialData = async () => {
+      try {
+        // Fetch users
+        const usersResponse = await getUsers();
+        const usersData = Array.isArray(usersResponse?.data) ? usersResponse.data : [];
+        setUsers(usersData);
 
-      // If in view mode and we have an account_owner string but no ID, try to find the user
-      if (viewMode && client && typeof client.account_owner === 'string' && !client.user_id) {
-        const ownerUser = usersData.find(u => 
-          u.name === client.account_owner || 
-          u.username === client.account_owner ||
-          u.email === client.account_owner
-        );
-        if (ownerUser) {
-          setFormData(prev => ({
-            ...prev,
-            account_owner: ownerUser.id
-          }));
-        }
+        // Fetch regions with countries
+        const response = await masterDataService.getRegionsWithCountries();
+        console.log('Regions data response:', response);
+        const regionsData = response?.data || [];
+        setRegions(regionsData);
+      } catch (error) {
+        console.error('Error fetching initial data:', error);
+        toast.error('Failed to load required data');
+        setUsers([]);
+        setRegions([]);
       }
+    };
 
-      // Fetch regions with countries
-      const response = await masterDataService.getRegionsWithCountries();
-      console.log('Regions data response:', response);
-      const regionsData = response?.data || [];
-      setRegions(regionsData);
-    } catch (error) {
-      console.error('Error fetching initial data:', error);
-      toast.error('Failed to load required data');
-      setUsers([]);
-      setRegions([]);
-    }
-  };
-
-  fetchInitialData();
-}, [viewMode, client]);
+    fetchInitialData();
+  }, [viewMode]);
 
   // Debug effect to log formData.industry and client prop
   useEffect(() => {
@@ -130,19 +115,27 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
   }, [formData.industry, client]);
 
   useEffect(() => {
-    if (client) {
+    if (client && users.length > 0) {
       console.log('Client data in form:', client);
       
       // Find the user ID that matches the account_owner name if account_owner is a string
       const getAccountOwnerId = () => {
+        // If we already have a numeric ID, return it
+        if (typeof client.account_owner === 'number') {
+          return client.account_owner;
+        }
+        
+        // If it's a string and we have users loaded, find the matching user
         if (typeof client.account_owner === 'string') {
           const ownerUser = users.find(u => 
             u.name === client.account_owner || 
             u.username === client.account_owner ||
-            u.email === client.account_owner
+            u.email === client.account_owner ||
+            u.full_name === client.account_owner
           );
           return ownerUser?.id || client.account_owner;
         }
+        
         return client.account_owner || '';
       };
 
@@ -210,7 +203,7 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
 
       setSelectedCountryIds(countryIds);
       setFormData(initialData);
-    } else {
+    } else if (!client) {
       // For new client, initialize with one empty address and contact
       setFormData(prev => ({
         ...prev,
@@ -226,7 +219,7 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
       }));
       setSelectedCountryIds({ 0: '' });
     }
-  }, [client]);
+  }, [client, users]); // Add users to dependencies
 
   const handleChange = (e) => {
     if (viewMode) return;
@@ -533,13 +526,6 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
               {viewMode ? 'VIEW CLIENT DETAILS' : client ? 'EDIT CLIENT' : 'NEW CLIENT'}
             </h2>
           </div>
-          {/* <Button
-            type="submit"
-            disabled={loading}
-            className="bg-[#0A2A43] hover:bg-[#0A2A43]/90 text-white"
-          >
-            {loading ? 'Saving...' : (client ? 'Update Client' : 'Create Client')}
-          </Button> */}
         </div>
         {/* Section 1 - Basic Client Details */}
         <div>
@@ -1087,4 +1073,3 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
 };
 
 export default ClientForm;
-
