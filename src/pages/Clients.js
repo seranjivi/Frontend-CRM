@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 const Clients = () => {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingClientDetails, setLoadingClientDetails] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
   const [viewingClient, setViewingClient] = useState(null);
@@ -147,7 +148,10 @@ const Clients = () => {
       e.stopPropagation();
     }
     
+    if (loadingClientDetails) return; // Prevent multiple clicks
+    
     try {
+      setLoadingClientDetails(true); // Start loading
       console.log('Client object (view):', client);
       const clientId = client.id || client._id || client.client_id;
       if (!clientId) {
@@ -188,7 +192,7 @@ const Clients = () => {
                 name: contact.name || '',
                 email: contact.email || '',
                 phone: contact.phone || '',
-                position: contact.position || '',
+                position: contact.designation || '',
                 is_primary: contact.is_primary || false
               }))
             : [{ name: '', email: '', phone: '', position: '', is_primary: false }]
@@ -201,6 +205,8 @@ const Clients = () => {
     } catch (error) {
       console.error('Error fetching client details (view):', error);
       toast.error('Failed to load client details');
+    } finally {
+      setLoadingClientDetails(false); // Stop loading in all cases
     }
   };
 
@@ -209,7 +215,10 @@ const Clients = () => {
       e.stopPropagation();
     }
     
+    if (loadingClientDetails) return; // Prevent multiple clicks
+    
     try {
+      setLoadingClientDetails(true); // Start loading
       console.log('Client object (edit):', client);
       const clientId = client.id || client._id || client.client_id;
       if (!clientId) {
@@ -250,7 +259,7 @@ const Clients = () => {
                 name: contact.name || '',
                 email: contact.email || '',
                 phone: contact.phone || '',
-                position: contact.position || '',
+                position: contact.designation || '',
                 is_primary: contact.is_primary || false
               }))
             : [{ name: '', email: '', phone: '', position: '', is_primary: false }]
@@ -263,6 +272,8 @@ const Clients = () => {
     } catch (error) {
       console.error('Error fetching client details (edit):', error);
       toast.error('Failed to load client details');
+    } finally {
+      setLoadingClientDetails(false); // Stop loading in all cases
     }
   };
 
@@ -403,10 +414,17 @@ const Clients = () => {
     {
       key: 'client_code',
       header: 'Client ID',
-      render: (value) => (
-        <span className="text-blue-600">
+      render: (value, row) => (
+        <button 
+          onClick={(e) => {
+            if (loadingClientDetails) return; // Prevent multiple clicks
+            e.stopPropagation();
+            handleView(row, e);
+          }}
+          className="text-blue-600 hover:underline cursor-pointer text-left"
+        >
           {value}
-        </span>
+        </button>
       ),
     },
     {
@@ -467,10 +485,22 @@ const Clients = () => {
       render: (value) => <span className="text-sm text-slate-700">{formatDate(value)}</span>
     },
   ];
- 
   const handleFileSelect = (file) => {
     setSelectedFile(file);
   };
+
+  // Full page loader for initial list loading
+  if (loading && clients.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-700 text-lg font-medium">Loading clients...</p>
+          <p className="text-sm text-gray-500 mt-1">Please wait while we fetch your client data</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-6 px-4">
@@ -566,6 +596,8 @@ const Clients = () => {
             <Button
               onClick={() => {
                 setEditingClient(null);
+                setViewingClient(null);
+                setIsViewMode(false);
                 setShowForm(true);
               }}
               className="h-9 text-xs sm:text-sm whitespace-nowrap bg-[#0A2A43] hover:bg-[#0A2A43]/90"
@@ -586,12 +618,23 @@ const Clients = () => {
           testId="clients-table"
           loading={loading}
           hideAddButton={true}
-          viewButtonClass="h-8 w-8 p-0 text-gray-600 hover:text-gray-800"
-          editButtonClass="h-8 w-8 p-0 text-blue-600 hover:text-blue-800"
-          deleteButtonClass="h-8 w-8 p-0 text-red-600 hover:text-red-800"
+          viewButtonClass={`h-8 w-8 p-0 ${loadingClientDetails ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:text-gray-800'}`}
+          editButtonClass={`h-8 w-8 p-0 ${loadingClientDetails ? 'text-blue-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-800'}`}
+          deleteButtonClass={`h-8 w-8 p-0 ${loadingClientDetails ? 'text-red-400 cursor-not-allowed' : 'text-red-600 hover:text-red-800'}`}
+          disableActions={loadingClientDetails}
         />
       </div>
- 
+
+      {/* Full-page loading overlay */}
+      {loadingClientDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+            <p className="text-gray-700">Loading client details...</p>
+          </div>
+        </div>
+      )}
+
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
           <ClientForm
