@@ -175,7 +175,7 @@ const Clients = () => {
           gst_tax_id: clientData.gst_tax_id || clientData.tax_id || '',
           client_status: clientData.status === 'active' || clientData.client_status === 'Active' ? 'Active' : 'Inactive',
           notes: clientData.notes || '',
-          account_owner: clientData.account_owner || clientData.user_id || '',
+          account_owner: clientData.account_owner_id || clientData.account_owner || clientData.user_id || '',
           addresses: clientData.addresses && clientData.addresses.length > 0 
             ? clientData.addresses.map(addr => ({
                 address_line1: addr.address_line1 || '',
@@ -192,7 +192,7 @@ const Clients = () => {
                 name: contact.name || '',
                 email: contact.email || '',
                 phone: contact.phone || '',
-                position: contact.designation || '',
+                designation: contact.designation || contact.position || '',
                 is_primary: contact.is_primary || false
               }))
             : [{ name: '', email: '', phone: '', position: '', is_primary: false }]
@@ -242,7 +242,7 @@ const Clients = () => {
           gst_tax_id: clientData.gst_tax_id || clientData.tax_id || '',
           client_status: clientData.status === 'active' || clientData.client_status === 'Active' ? 'Active' : 'Inactive',
           notes: clientData.notes || '',
-          account_owner: clientData.account_owner || clientData.user_id || '',
+          account_owner: clientData.account_owner_id || clientData.account_owner || clientData.user_id || '',
           addresses: clientData.addresses && clientData.addresses.length > 0 
             ? clientData.addresses.map(addr => ({
                 address_line1: addr.address_line1 || '',
@@ -259,7 +259,7 @@ const Clients = () => {
                 name: contact.name || '',
                 email: contact.email || '',
                 phone: contact.phone || '',
-                position: contact.designation || '',
+                designation: contact.designation || contact.position || '',
                 is_primary: contact.is_primary || false
               }))
             : [{ name: '', email: '', phone: '', position: '', is_primary: false }]
