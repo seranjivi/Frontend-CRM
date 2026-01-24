@@ -110,7 +110,6 @@ const Opportunities = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const content = e.target.result;
-        console.log('File content:', content);
         // Add your import logic here
         toast.success(`File "${file.name}" imported successfully!`);
       };
@@ -510,7 +509,6 @@ const Opportunities = () => {
   onFileSelect={async (file) => {
     try {
       const response = await opportunityService.importOpportunities(file);
-      console.log('Import response:', response);
       toast.success('Opportunities imported successfully!');
       fetchOpportunities(); 
       setShowImportModal(false);

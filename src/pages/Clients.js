@@ -204,19 +204,13 @@ const Clients = () => {
     
     try {
       setLoadingClientDetails(true); // Start loading
-      console.log('Client object (view):', client);
       const clientId = client.id || client._id || client.client_id;
       if (!clientId) {
         throw new Error('Client ID not found');
       }
-      console.log('Using client ID (view):', clientId);
-      const response = await clientService.getClientById(clientId);
-      console.log('API Response (view):', response);
-      
+      const response = await clientService.getClientById(clientId);      
       if (response) {
-        const clientData = response.data || response;
-        console.log('Client data (view):', clientData);
-        
+        const clientData = response.data || response;        
         const formData = {
           id: clientData.id || clientData._id || clientData.client_id,
           client_name: clientData.client_name || '',
@@ -271,19 +265,13 @@ const Clients = () => {
     
     try {
       setLoadingClientDetails(true); // Start loading
-      console.log('Client object (edit):', client);
       const clientId = client.id || client._id || client.client_id;
       if (!clientId) {
         throw new Error('Client ID not found');
       }
-      console.log('Using client ID (edit):', clientId);
-      const response = await clientService.getClientById(clientId);
-      console.log('API Response (edit):', response);
-      
+      const response = await clientService.getClientById(clientId);      
       if (response) {
         const clientData = response.data || response;
-        console.log('Client data (edit):', clientData);
-        
         const formData = {
           id: clientData.id || clientData._id || clientData.client_id,
           client_name: clientData.client_name || '',

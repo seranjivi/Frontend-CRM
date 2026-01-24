@@ -52,11 +52,8 @@ const fetchUsers = async () => {
 
   const handleEdit = async (user) => {
     try {
-      console.log('Starting to edit user:', user);
       const response = await userService.getUserById(user.id);
-      const userData = response.data;  // Extract data from response
-      console.log('Raw user data from API:', userData);
-      
+      const userData = response.data;  // Extract data from response      
       // Transform the data to match the expected format
       const formattedUser = {
         ...userData,
@@ -69,8 +66,6 @@ const fetchUsers = async () => {
         regions: userData.regions || userData.assigned_regions || [],
         id: userData.id || user.id
       };
-      
-      console.log('Formatted user data for edit:', formattedUser);
       setEditingUser(formattedUser);
       setShowForm(true);
     } catch (error) {

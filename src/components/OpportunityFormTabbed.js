@@ -24,17 +24,6 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   // Reset form when opportunity changes
   useEffect(() => {
     if (!opportunity) {
-      console.log('DEBUG - API Response:', {
-      lead_source: opportunity.lead_source,
-      type: opportunity.opportunity_type,
-      triaged_status: opportunity.triaged_status,
-      sales_owner: opportunity.sales_owner,
-      sales_owner_name: opportunity.sales_owner_name,
-      technical_poc: opportunity.technical_poc,
-      technical_poc_name: opportunity.technical_poc_name,
-      presales_poc: opportunity.presales_poc,
-      presales_poc_name: opportunity.presales_poc_name
-    });
       setFormData(defaultFormData);
     }
   }, [opportunity]);
@@ -193,16 +182,6 @@ const PIPELINE_STATUSES = [
 
   // Debug logging for form data
   useEffect(() => {
-    console.log('Current form data for users:', {
-      sales_owner: formData.opportunity.sales_owner,
-      sales_owner_name: formData.opportunity.sales_owner_name,
-      technical_poc: formData.opportunity.technical_poc,
-      technical_poc_name: formData.opportunity.technical_poc_name,
-      presales_poc: formData.opportunity.presales_poc,
-      presales_poc_name: formData.opportunity.presales_poc_name,
-      leadSource: formData.opportunity.leadSource,
-      users: users.length
-    });
   }, [formData.opportunity, users]);
 
   // Fetch users for dropdowns
@@ -211,8 +190,6 @@ const PIPELINE_STATUSES = [
       try {
         setIsLoadingUsers(true);
         const response = await getUsers();
-        console.log('Users API Response:', response);
-
         // Map the response to ensure we have the correct structure
         const formattedUsers = Array.isArray(response)
           ? response
@@ -220,7 +197,6 @@ const PIPELINE_STATUSES = [
             ? response.data
             : [];
 
-        console.log('Formatted Users:', formattedUsers);
         setUsers(formattedUsers);
       } catch (error) {
         console.error('Error fetching users:', error);
@@ -236,19 +212,6 @@ const PIPELINE_STATUSES = [
   // Update form data when opportunity prop changes
 useEffect(() => {
   if (opportunity) {
-    console.log('Raw opportunity data:', opportunity);
-    console.log('DEBUG - API Opportunity data:', {
-      opportunity_type: opportunity.opportunity_type,
-      lead_source: opportunity.lead_source,
-      triaged_status: opportunity.triaged_status,
-      sales_owner: opportunity.sales_owner,
-      sales_owner_name: opportunity.sales_owner_name,
-      technical_poc: opportunity.technical_poc,
-      technical_poc_name: opportunity.technical_poc_name,
-      presales_poc: opportunity.presales_poc,
-      presales_poc_name: opportunity.presales_poc_name
-    });
-
     // Create new form data object
     const newFormData = {
       opportunity: {
@@ -328,19 +291,6 @@ useEffect(() => {
         ? opportunity.sowDocuments
         : []
     };
-
-    console.log('New form data being set:', {
-      sales_owner: newFormData.opportunity.sales_owner,
-      sales_owner_name: newFormData.opportunity.sales_owner_name,
-      technical_poc: newFormData.opportunity.technical_poc,
-      technical_poc_name: newFormData.opportunity.technical_poc_name,
-      presales_poc: newFormData.opportunity.presales_poc,
-      presales_poc_name: newFormData.opportunity.presales_poc_name,
-      type: newFormData.opportunity.type,
-      leadSource: newFormData.opportunity.leadSource,
-      triaged: newFormData.opportunity.triaged
-    });
-
     setFormData(newFormData);
   }
 }, [opportunity]);
@@ -550,11 +500,6 @@ useEffect(() => {
         presales_poc: formData.opportunity.presales_poc || null
       };
 
-      console.log('Submitting opportunity data:', JSON.stringify({
-        isEdit,
-        opportunityId,
-        ...opportunityData
-      }, null, 2));
 
       let result;
       if (isEdit) {
@@ -933,7 +878,6 @@ useEffect(() => {
   <Select
     value={formData.opportunity.type || opportunity?.opportunity_type || ''}
     onValueChange={(value) => {
-      console.log('Type selected:', value);
       updateOpportunityData('type', value);
     }}
     required
@@ -1022,7 +966,6 @@ useEffect(() => {
   <Select
     value={formData.opportunity.sales_owner || ''}
     onValueChange={(value) => {
-      console.log('Sales Owner changed to:', value);
       updateOpportunityData('sales_owner', value);
       
       const selectedUser = users.find(u => 
@@ -1074,7 +1017,6 @@ useEffect(() => {
                     <Select
                       value={formData.opportunity.technical_poc || ''}
                       onValueChange={(value) => {
-                        console.log('Technical POC selected:', value);
                         updateOpportunityData('technical_poc', value);
                         // Also update the name when a user is selected
                         if (value) {
@@ -1125,7 +1067,6 @@ useEffect(() => {
                     <Select
                       value={formData.opportunity.presales_poc || ''}
                       onValueChange={(value) => {
-                        console.log('Presales POC selected:', value);
                         updateOpportunityData('presales_poc', value);
                         // Also update the name when a user is selected
                         if (value) {
@@ -1412,7 +1353,6 @@ useEffect(() => {
                     <Select
                       value={formData.rfpDetails.bidManager}
                       onValueChange={(value) => {
-                        console.log('New value selected:', value);
                         updateRfpDetails('bidManager', value);
                       }}
                     >

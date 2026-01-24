@@ -41,9 +41,7 @@ const RFPDetails = () => {
     const fetchRFPs = async () => {
       try {
         setLoading(true);
-        const response = await rfpService.getRFPs();
-        console.log('API Response:', response); // Log the response for debugging
-        
+        const response = await rfpService.getRFPs();        
         // Check if the response is an array, if not, use response.data or fallback to empty array
         const responseData = Array.isArray(response) ? response : 
                           (response?.data && Array.isArray(response.data) ? response.data : []);
@@ -206,12 +204,10 @@ const RFPDetails = () => {
   };
   // Handlers for table actions
   const handleView = (item) => {
-    console.log('View item:', item);
     // Add your view logic here
   };
 
   const handleEdit = (item) => {
-    console.log('Edit item:', item);
     // Add your edit logic here
   };
 

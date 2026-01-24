@@ -153,7 +153,6 @@ const SOWs = () => {
 
   const handleImportSOW = () => {
     // Handle import SOW
-    console.log('Import SOW');
   };
 
   const handleDelete = async (sow) => {

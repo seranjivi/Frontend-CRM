@@ -26,8 +26,6 @@ async function testUserAPI() {
         
         if (response.ok) {
             const data = await response.json();
-            console.log('Success! Users data:', data);
-            console.log('Number of users:', data.length);
         } else {
             const errorText = await response.text();
             console.error('API Error:', response.status, errorText);
