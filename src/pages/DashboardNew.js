@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import dashboardService from '../services/dashboardService';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -32,38 +33,49 @@ const Dashboard = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
+        const response = await dashboardService.getDashboardStats();
+        const { totals, conversionFunnel, sourceDistribution } = response.data;
         
-        // Mock data - replace with actual API calls
+        // Update KPI data
         setKpiData({
-          leads: { count: 1250, change: 12.5 },
-          opportunities: { value: 1250000, count: 42, change: 8.2 },
-          sales: { count: 89, change: 5.7 },
-          projects: { count: 36, change: 2.3 }
+          leads: { 
+            count: totals.opportunities || 0, 
+            change: 0 // You can calculate this based on previous data if needed
+          },
+          opportunities: { 
+            value: totals.value || 0, 
+            count: totals.opportunities || 0, 
+            change: 0 // You can calculate this based on previous data if needed
+          },
+          sales: { 
+            count: totals.won || 0, 
+            change: 0 // You can calculate this based on previous data if needed
+          },
+          projects: { 
+            count: totals.open || 0, 
+            change: 0 // You can calculate this based on previous data if needed
+          }
         });
 
+        // Update funnel data
         setFunnelData([
-          { name: 'Leads', value: 1250, color: '#1d4ed8' },
-          { name: 'Qualified', value: 780, color: '#3b82f6' },
-          { name: 'Opportunities', value: 420, color: '#60a5fa' },
-          { name: 'Won', value: 89, color: '#93c5fd' }
+          { name: 'Leads', value: conversionFunnel.total || 0, color: '#1d4ed8' },
+          { name: 'Opportunities', value: conversionFunnel.rfb || 0, color: '#3b82f6' },
+          // { name: 'Proposal', value: conversionFunnel.proposal || 0, color: '#60a5fa' },
+          { name: 'SOW', value: conversionFunnel.sow || 0, color: '#60a5fa' },
+          { name: 'Won', value: conversionFunnel.won || 0, color: '#3b82f6' }
         ]);
 
-        setSourceData([
-          { name: 'Advertisement', value: 120, color: '#3b82f6' },
-          { name: 'Cold Call', value: 80, color: '#10b981' },
-          { name: 'Employee Referral', value: 150, color: '#f59e0b' },
-          { name: 'External Referral', value: 90, color: '#8b5cf6' },
-          { name: 'Online Store', value: 200, color: '#ec4899' },
-          { name: 'Partner', value: 75, color: '#06b6d4' },
-          { name: 'Public Relations', value: 60, color: '#f97316' },
-          { name: 'Sales Email', value: 180, color: '#6366f1' },
-          { name: 'Seminar / Trade Show', value: 95, color: '#14b8a6' },
-          { name: 'Web Download', value: 110, color: '#f43f5e' },
-          { name: 'Web Research', value: 70, color: '#a855f7' },
-          { name: 'Chat / Portal / Others', value: 50, color: '#84cc16' }
-        ].sort((a, b) => b.value - a.value));
+        // Update source distribution (only show sources with values > 0)
+        const filteredSources = sourceDistribution
+          .filter(item => item.value > 0)
+          .map(item => ({
+            ...item,
+            color: `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`
+          }))
+          .sort((a, b) => b.value - a.value);
+
+        setSourceData(filteredSources);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -244,9 +256,17 @@ const Dashboard = () => {
             <div className="flex flex-col space-y-4 p-4">
               {funnelData.map((stage, index) => {
                 const widthPercentage = (stage.value / funnelData[0].value) * 100;
-                const conversionRate = index > 0 
-                  ? Math.round((stage.value / funnelData[index - 1].value) * 100)
-                  : 100;
+                let conversionRate = 0;
+                
+                if (index === 0) {
+                  conversionRate = 100; // First stage is always 100%
+                } else if (funnelData[index - 1].value > 0) {
+                  // Calculate percentage relative to previous stage
+                  conversionRate = Math.round((stage.value / funnelData[index - 1].value) * 100);
+                }
+                
+                // Ensure we don't show more than 100% conversion
+                conversionRate = Math.min(conversionRate, 100);
                 
                 return (
                   <div key={stage.name} className="space-y-2">
