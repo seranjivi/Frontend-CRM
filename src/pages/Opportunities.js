@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import opportunityService from '../services/opportunityService';
 import { Button } from '../components/ui/button';
-import { Plus, ArrowRight, Filter, Upload, Download, Search, CheckCircle } from 'lucide-react';
+import { Plus, ArrowRight, Filter, Upload, Download, Search, CheckCircle, Edit } from 'lucide-react';
 import ImportCSVModal from '../components/ImportCSVModal';
 import DataTable from '../components/DataTable';
 import OpportunityFormTabbed from '../components/OpportunityFormTabbed';
@@ -233,71 +233,14 @@ const Opportunities = () => {
 
   const handleEdit = async (opportunity) => {
     try {
-      setLoading(true);
-      setIsRFPView(false); // Not in RFP view when using edit
-      setShowOnlyDetails(true); // Show only Details tab when editing
-      // Fetch the latest opportunity data by ID
-      const response = await opportunityService.getOpportunityById(opportunity.id || opportunity.opportunity_id);
-      
-      console.log('API Response:', response); // Debug log
-      
-      // The API response has the data in response.data
-      const apiData = response.data?.data || opportunity;
-      console.log('API Data:', apiData); // Debug log
-      
-      // Format the data to match the form's expected structure
-      const formattedData = {
-        opportunity: {
-          opportunity_name: apiData.opportunity_name || '',
-          clientId: apiData.client_id || '',
-          client_name: apiData.client_name || 'Unknown Client',
-          closeDate: apiData.close_date ? new Date(apiData.close_date).toISOString().split('T')[0] : '',
-          amount: parseFloat(apiData.amount) || 0,
-          currency: apiData.amount_currency || 'USD',
-          leadSource: apiData.lead_source || '',
-          type: apiData.opportunity_type || 'New Business',
-          triaged: apiData.triaged_status || 'Hold',
-          pipelineStatus: apiData.pipeline_status || 'Proposal Work-in-Progress',
-          winProbability: apiData.win_probability || 20,
-          nextSteps: [], // Default empty array for next steps
-          createdBy: apiData.user_name || 'System',
-          description: '',
-          id: apiData.id || opportunity.id || ''
-        },
-        rfpDetails: {
-          rfpTitle: '',
-          rfpStatus: 'Draft',
-          submissionDeadline: '',
-          bidManager: '',
-          submissionMode: '',
-          portalUrl: '',
-          qaLogs: []
-        },
-        sowDetails: {
-          sowTitle: '',
-          sowStatus: 'Draft',
-          contractValue: 0,
-          currency: apiData.amount_currency || 'USD',
-          targetKickoffDate: '',
-          linkedProposalRef: '',
-          scopeOverview: ''
-        },
-        rfpDocuments: [],
-        sowDocuments: []
-      };
-      
-      console.log('Formatted Data for Form:', formattedData); // Debug log
-      
-      setEditingOpportunity(formattedData);
+      const response = await opportunityService.getOpportunityById(opportunity.id);
+      setEditingOpportunity(response.data);
       setShowForm(true);
+      setShowOnlyDetails(true); // Only show Details tab
+      setIsRFPView(false);
     } catch (error) {
       console.error('Error fetching opportunity details:', error);
       toast.error('Failed to load opportunity details');
-      // Fallback to the existing opportunity data if API call fails
-      setEditingOpportunity(opportunity);
-      setShowForm(true);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -455,19 +398,22 @@ const Opportunities = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleEdit(row)}
-            className="h-8 w-8 p-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEdit(row);
+            }}
+            className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600"
             title="Edit"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-            </svg>
+            <Edit className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleDelete(row)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete(row);
+            }}
             className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
             title="Delete"
           >
