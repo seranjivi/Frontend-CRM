@@ -45,6 +45,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   const [nextStepInput, setNextStepInput] = useState('');
   const [isSubmittingNextStep, setIsSubmittingNextStep] = useState(false);
   const [newQaQuestion, setNewQaQuestion] = useState('');
+  const [isQaExpanded, setIsQaExpanded] = useState(false);
   const [clients, setClients] = useState([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -1441,60 +1442,148 @@ const PIPELINE_STATUSES = [
 
                   {/* Q&A Logs */}
                   <div className="md:col-span-2 -mt-2">
-                    <div className="mb-2">
-                      <Label>Q&A</Label>
-                      <div className="flex flex-col space-y-2 w-full">
-                        <div className="flex flex-col space-y-2 w-full">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="mb-2 bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-200"
+                      onClick={() => setIsQaExpanded(!isQaExpanded)}
+                    >
+                      Q&A
+                    </Button>
+                    
+                    {isQaExpanded && (
+                      <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="question-submission-date">Question Submission Date</Label>
+                            <Input
+                              id="question-submission-date"
+                              type="date"
+                              className="mt-1 w-full"
+                              value={formData.rfpDetails.qaLogs?.[0]?.questionSubmissionDate ? 
+                                formatDateForInput(formData.rfpDetails.qaLogs[0].questionSubmissionDate) : 
+                                formatDateForInput(new Date().toISOString())}
+                              onChange={(e) => {
+                                if (formData.rfpDetails.qaLogs?.length > 0) {
+                                  const updatedQaLogs = [...formData.rfpDetails.qaLogs];
+                                  updatedQaLogs[0] = {
+                                    ...updatedQaLogs[0],
+                                    questionSubmissionDate: e.target.value,
+                                    askedAt: e.target.value || new Date().toISOString()
+                                  };
+                                  updateRfpDetails('qaLogs', updatedQaLogs);
+                                } else {
+                                  const newQa = {
+                                    id: Date.now().toString(),
+                                    question: '',
+                                    askedBy: 'current_user',
+                                    askedAt: new Date().toISOString(),
+                                    questionSubmissionDate: e.target.value,
+                                    responseSubmissionDate: '',
+                                    answer: ''
+                                  };
+                                  updateRfpDetails('qaLogs', [newQa]);
+                                }
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="response-submission-date">Response Submission Date</Label>
+                            <Input
+                              id="response-submission-date"
+                              type="date"
+                              className="mt-1 w-full"
+                              value={formData.rfpDetails.qaLogs?.[0]?.responseSubmissionDate ? 
+                                formatDateForInput(formData.rfpDetails.qaLogs[0].responseSubmissionDate) : ''}
+                              onChange={(e) => {
+                                if (formData.rfpDetails.qaLogs?.length > 0) {
+                                  const updatedQaLogs = [...formData.rfpDetails.qaLogs];
+                                  updatedQaLogs[0] = {
+                                    ...updatedQaLogs[0],
+                                    responseSubmissionDate: e.target.value,
+                                    answeredBy: 'current_user',
+                                    answeredAt: new Date().toISOString()
+                                  };
+                                  updateRfpDetails('qaLogs', updatedQaLogs);
+                                } else {
+                                  const newQa = {
+                                    id: Date.now().toString(),
+                                    question: '',
+                                    askedBy: 'current_user',
+                                    askedAt: new Date().toISOString(),
+                                    questionSubmissionDate: new Date().toISOString(),
+                                    responseSubmissionDate: e.target.value,
+                                    answer: ''
+                                  };
+                                  updateRfpDetails('qaLogs', [newQa]);
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="qa-comment">Comment Box</Label>
                           <Textarea
-                            value={newQaQuestion}
-                            onChange={(e) => setNewQaQuestion(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey && newQaQuestion.trim()) {
-                                e.preventDefault();
+                            id="qa-comment"
+                            className="mt-1 w-full min-h-[100px]"
+                            placeholder="Add your comments here..."
+                            value={formData.rfpDetails.qaLogs?.[0]?.question || ''}
+                            onChange={(e) => {
+                              if (formData.rfpDetails.qaLogs?.length > 0) {
+                                const updatedQaLogs = [...formData.rfpDetails.qaLogs];
+                                updatedQaLogs[0] = {
+                                  ...updatedQaLogs[0],
+                                  question: e.target.value
+                                };
+                                updateRfpDetails('qaLogs', updatedQaLogs);
+                              } else {
                                 const newQa = {
                                   id: Date.now().toString(),
-                                  question: newQaQuestion.trim(),
+                                  question: e.target.value,
                                   askedBy: 'current_user',
                                   askedAt: new Date().toISOString(),
                                   questionSubmissionDate: new Date().toISOString(),
                                   responseSubmissionDate: '',
                                   answer: ''
                                 };
-                                updateRfpDetails('qaLogs', [...(formData.rfpDetails.qaLogs || []), newQa]);
-                                setNewQaQuestion('');
+                                updateRfpDetails('qaLogs', [newQa]);
                               }
                             }}
-                            placeholder="Type your question here..."
-                            className="min-h-[80px] w-full"
                           />
-                          <div className="flex justify-end">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                if (newQaQuestion.trim()) {
-                                  const newQa = {
-                                    id: Date.now().toString(),
-                                    question: newQaQuestion.trim(),
-                                    askedBy: 'current_user',
-                                    askedAt: new Date().toISOString(),
-                                    questionSubmissionDate: new Date().toISOString(),
-                                    responseSubmissionDate: '',
-                                    answer: ''
-                                  };
-                                  updateRfpDetails('qaLogs', [...(formData.rfpDetails.qaLogs || []), newQa]);
-                                  setNewQaQuestion('');
-                                }
-                              }}
-                              disabled={!newQaQuestion.trim()}
-                              className="w-fit"
-                            >
-                              <Plus className="mr-1 h-4 w-4" /> Add Q&A
-                            </Button>
+                        </div>
+                        
+                        <div>
+                          <Label>QA Document Upload</Label>
+                          <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md">
+                            <div className="space-y-1 text-center">
+                              <div className="flex text-sm text-muted-foreground">
+                                <label
+                                  htmlFor="file-upload"
+                                  className="relative cursor-pointer bg-transparent rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none"
+                                >
+                                  <span>Upload a file</span>
+                                  <input
+                                    id="file-upload"
+                                    name="file-upload"
+                                    type="file"
+                                    className="sr-only"
+                                    onChange={(e) => {
+                                      // Handle file upload logic here
+                                      console.log('File selected:', e.target.files[0]);
+                                    }}
+                                  />
+                                </label>
+                                <p className="pl-1">or drag and drop</p>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                PDF, DOC, DOCX up to 10MB
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
+<<<<<<< HEAD
                     </div>
                     <div className="space-y-1">
                       {formData.rfpDetails.qaLogs?.map((qa, index) => (
@@ -1567,6 +1656,9 @@ const PIPELINE_STATUSES = [
                         </div>
                       ))}
                     </div>
+=======
+                    )}
+>>>>>>> origin/main
                   </div>
                 </div>
               </CardContent>
@@ -1578,12 +1670,75 @@ const PIPELINE_STATUSES = [
                 <CardTitle>Documents</CardTitle>
               </CardHeader>
               <CardContent>
-                <MultiFileUpload
-                  files={formData.rfpDocuments}
-                  onChange={(files) => setFormData(prev => ({ ...prev, rfpDocuments: files }))}
-                  allowedTypes={['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']}
-                  maxSize={10 * 1024 * 1024} // 10MB
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Commercial */}
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-2">Commercial</h4>
+                    <MultiFileUpload
+                      files={formData.rfpDocuments?.commercial || []}
+                      onChange={(files) => setFormData(prev => ({
+                        ...prev,
+                        rfpDocuments: {
+                          ...prev.rfpDocuments,
+                          commercial: files
+                        }
+                      }))}
+                      allowedTypes={['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']}
+                      maxSize={10 * 1024 * 1024} // 10MB
+                    />
+                  </div>
+
+                  {/* Proposal */}
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-2">Proposal</h4>
+                    <MultiFileUpload
+                      files={formData.rfpDocuments?.proposal || []}
+                      onChange={(files) => setFormData(prev => ({
+                        ...prev,
+                        rfpDocuments: {
+                          ...prev.rfpDocuments,
+                          proposal: files
+                        }
+                      }))}
+                      allowedTypes={['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']}
+                      maxSize={10 * 1024 * 1024} // 10MB
+                    />
+                  </div>
+
+                  {/* Presentation */}
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-2">Presentation</h4>
+                    <MultiFileUpload
+                      files={formData.rfpDocuments?.presentation || []}
+                      onChange={(files) => setFormData(prev => ({
+                        ...prev,
+                        rfpDocuments: {
+                          ...prev.rfpDocuments,
+                          presentation: files
+                        }
+                      }))}
+                      allowedTypes={['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']}
+                      maxSize={10 * 1024 * 1024} // 10MB
+                    />
+                  </div>
+
+                  {/* Other */}
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-2">Other</h4>
+                    <MultiFileUpload
+                      files={formData.rfpDocuments?.other || []}
+                      onChange={(files) => setFormData(prev => ({
+                        ...prev,
+                        rfpDocuments: {
+                          ...prev.rfpDocuments,
+                          other: files
+                        }
+                      }))}
+                      allowedTypes={['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']}
+                      maxSize={10 * 1024 * 1024} // 10MB
+                    />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
