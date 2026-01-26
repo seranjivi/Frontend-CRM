@@ -180,120 +180,155 @@ const PIPELINE_STATUSES = [
   const [users, setUsers] = useState([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
-  // Debug logging for form data
-  useEffect(() => {
-  }, [formData.opportunity, users]);
-
-  // Fetch users for dropdowns
+  // Fetch users on component mount and update form data when users are loaded
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         setIsLoadingUsers(true);
         const response = await getUsers();
-        // Map the response to ensure we have the correct structure
-        const formattedUsers = Array.isArray(response)
-          ? response
-          : Array.isArray(response?.data)
-            ? response.data
-            : [];
+        const usersData = Array.isArray(response?.data) ? response.data : [];
+        setUsers(usersData);
 
-        setUsers(formattedUsers);
+        // After loading users, update the form data to ensure proper display of selected users
+        if (opportunity) {
+          const updateUserField = (field, nameField) => {
+            const userId = String(opportunity[field] || opportunity.opportunity?.[field] || '');
+            const userName = opportunity[`${field}_name`] || opportunity.opportunity?.[`${field}_name`] || '';
+            
+            if (userId && !userName) {
+              const selectedUser = usersData.find(user => 
+                String(user.id) === userId || 
+                String(user._id) === userId
+              );
+
+              if (selectedUser) {
+                setFormData(prev => ({
+                  ...prev,
+                  opportunity: {
+                    ...prev.opportunity,
+                    [field]: userId,
+                    [nameField]: selectedUser.full_name || 
+                                selectedUser.name || 
+                                selectedUser.email || 
+                                `User ${selectedUser.id || selectedUser._id}`
+                  }
+                }));
+              } else if (userId) {
+                setFormData(prev => ({
+                  ...prev,
+                  opportunity: {
+                    ...prev.opportunity,
+                    [field]: userId,
+                    [nameField]: `User ${userId}`
+                  }
+                }));
+              }
+            }
+          };
+
+          // Update sales_owner, technical_poc, and presales_poc fields
+          updateUserField('sales_owner', 'sales_owner_name');
+          updateUserField('technical_poc', 'technical_poc_name');
+          updateUserField('presales_poc', 'presales_poc_name');
+        }
       } catch (error) {
         console.error('Error fetching users:', error);
         toast.error('Failed to load users');
+        setUsers([]);
       } finally {
         setIsLoadingUsers(false);
       }
     };
 
     fetchUsers();
-  }, []);
+  }, [opportunity]); // Add opportunity to dependency array
 
   // Update form data when opportunity prop changes
-useEffect(() => {
-  if (opportunity) {
-    // Create new form data object
-    const newFormData = {
-      opportunity: {
-        ...defaultFormData.opportunity,
-        // Map API fields to form fields
-        opportunity_name: opportunity.opportunity_name || opportunity.opportunity?.opportunity_name || '',
-        client_name: opportunity.client_name || opportunity.opportunity?.client_name || 'Unknown Client',
-        closeDate: opportunity.close_date || opportunity.opportunity?.closeDate || '',
-        // Handle both snake_case and camelCase date formats, and ensure proper date string format
-        start_date: opportunity.start_date ||
-          opportunity.opportunity?.start_date ||
-          (opportunity.opportunity?.startDate ?
-            new Date(opportunity.opportunity.startDate).toISOString().split('T')[0] :
-            ''),
-        
-        // CRITICAL FIX: Add these missing user fields
-         sales_owner: String(opportunity.sales_owner || ''), // Convert to string
-        sales_owner_name: opportunity.sales_owner_name || '',
-        technical_poc: String(opportunity.technical_poc || ''), // Convert to string
-        technical_poc_name: opportunity.technical_poc_name || '',
-        presales_poc: String(opportunity.presales_poc || ''), // Convert to string
-        presales_poc_name: opportunity.presales_poc_name || '',
-        
-        amount: opportunity.amount || opportunity.opportunity?.amount || '',
-        currency: opportunity.amount_currency || opportunity.currency || opportunity.opportunity?.currency || 'USD',
-        
-        // FIX: Remove duplicate leadSource line
-        leadSource: opportunity.lead_source || opportunity.leadSource || opportunity.opportunity?.leadSource || '',
-        
-        // FIX: Make sure these are properly mapped
-        type: opportunity.opportunity_type || opportunity.type || opportunity.opportunity?.type || 'New Business',
-        triaged: opportunity.triaged_status || opportunity.opportunity?.triaged || 'Hold',
-        
-        pipelineStatus: opportunity.pipeline_status || opportunity.opportunity?.pipelineStatus || 'Proposal Work-in-Progress',
-        winProbability: opportunity.win_probability || opportunity.opportunity?.winProbability || 20,
-        nextSteps: Array.isArray(opportunity.next_steps) ? opportunity.next_steps : 
-                  (Array.isArray(opportunity.nextSteps) ? opportunity.nextSteps :
-                  (Array.isArray(opportunity.opportunity?.nextSteps) ? opportunity.opportunity.nextSteps : [])),
-        createdBy: opportunity.created_by || opportunity.user_name || opportunity.opportunity?.createdBy || 'System',
-        description: opportunity.description || opportunity.opportunity?.description || '',
-        id: opportunity.id || opportunity.opportunity?.id || '',
-        // Include any other direct opportunity fields that might be at the root level
-        ...(opportunity.opportunity || {})
-      },
-      rfpDetails: {
-        ...defaultFormData.rfpDetails,
-        ...(opportunity.rfpDetails || {}),
-        // Map RFP details from root level if they exist
-        rfpTitle: opportunity.rfp_title || opportunity.rfpDetails?.rfpTitle || '',
-        rfpStatus: opportunity.rfp_status || opportunity.rfpDetails?.rfpStatus || 'Draft',
-        submissionDeadline: opportunity.submission_deadline || opportunity.rfpDetails?.submissionDeadline || '',
-        bidManager: opportunity.bid_manager || opportunity.rfpDetails?.bidManager || '',
-        submissionMode: opportunity.submission_mode || opportunity.rfpDetails?.submissionMode || '',
-        portalUrl: opportunity.portal_url || opportunity.rfpDetails?.portalUrl || '',
-        qaLogs: Array.isArray(opportunity.qa_logs)
-          ? opportunity.qa_logs
-          : (Array.isArray(opportunity.rfpDetails?.qaLogs)
-            ? opportunity.rfpDetails.qaLogs
-            : [])
-      },
-      sowDetails: {
-        ...defaultFormData.sowDetails,
-        ...(opportunity.sowDetails || {}),
-        // Map SOW details from root level if they exist
-        sowTitle: opportunity.sow_title || opportunity.sowDetails?.sowTitle || '',
-        sowStatus: opportunity.sow_status || opportunity.sowDetails?.sowStatus || 'Draft',
-        contractValue: opportunity.contract_value || opportunity.sowDetails?.contractValue || 0,
-        currency: opportunity.currency || opportunity.sowDetails?.currency || 'USD',
-        targetKickoffDate: opportunity.target_kickoff_date || opportunity.sowDetails?.targetKickoffDate || '',
-        linkedProposalRef: opportunity.linked_proposal_ref || opportunity.sowDetails?.linkedProposalRef || '',
-        scopeOverview: opportunity.scope_overview || opportunity.sowDetails?.scopeOverview || ''
-      },
-      rfpDocuments: Array.isArray(opportunity.rfpDocuments)
-        ? opportunity.rfpDocuments
-        : [],
-      sowDocuments: Array.isArray(opportunity.sowDocuments)
-        ? opportunity.sowDocuments
-        : []
-    };
-    setFormData(newFormData);
-  }
-}, [opportunity]);
+  useEffect(() => {
+    if (opportunity) {
+      // Create new form data object
+      const newFormData = {
+        opportunity: {
+          ...defaultFormData.opportunity,
+          // Map API fields to form fields
+          opportunity_name: opportunity.opportunity_name || opportunity.opportunity?.opportunity_name || '',
+          client_name: opportunity.client_name || opportunity.opportunity?.client_name || 'Unknown Client',
+          closeDate: opportunity.close_date || opportunity.opportunity?.closeDate || '',
+          // Handle both snake_case and camelCase date formats, and ensure proper date string format
+          start_date: opportunity.start_date ||
+            opportunity.opportunity?.start_date ||
+            (opportunity.opportunity?.startDate ?
+              new Date(opportunity.opportunity.startDate).toISOString().split('T')[0] :
+              ''),
+          
+          // Handle sales owner data
+          sales_owner: String(opportunity.sales_owner || opportunity.opportunity?.sales_owner || ''),
+          sales_owner_name: opportunity.sales_owner_name || opportunity.opportunity?.sales_owner_name || 
+                           (opportunity.sales_owner ? `User ${opportunity.sales_owner}` : ''),
+          technical_poc: String(opportunity.technical_poc || ''), // Convert to string
+          technical_poc_name: opportunity.technical_poc_name || '',
+          presales_poc: String(opportunity.presales_poc || ''), // Convert to string
+          presales_poc_name: opportunity.presales_poc_name || '',
+          
+          amount: opportunity.amount || opportunity.opportunity?.amount || '',
+          currency: opportunity.amount_currency || opportunity.currency || opportunity.opportunity?.currency || 'USD',
+          
+          // FIX: Remove duplicate leadSource line
+          leadSource: opportunity.lead_source || opportunity.leadSource || opportunity.opportunity?.leadSource || '',
+          
+          // FIX: Make sure these are properly mapped
+          type: opportunity.opportunity_type || opportunity.type || opportunity.opportunity?.type || 'New Business',
+          triaged: opportunity.triaged_status || opportunity.opportunity?.triaged || 'Hold',
+          
+          pipelineStatus: opportunity.pipeline_status || opportunity.opportunity?.pipelineStatus || 'Proposal Work-in-Progress',
+          winProbability: opportunity.win_probability || opportunity.opportunity?.winProbability || 20,
+          nextSteps: Array.isArray(opportunity.next_steps) ? opportunity.next_steps : 
+                    (Array.isArray(opportunity.nextSteps) ? opportunity.nextSteps :
+                    (Array.isArray(opportunity.opportunity?.nextSteps) ? opportunity.opportunity.nextSteps : [])),
+          createdBy: opportunity.created_by || opportunity.user_name || opportunity.opportunity?.createdBy || 'System',
+          description: opportunity.description || opportunity.opportunity?.description || '',
+          id: opportunity.id || opportunity.opportunity?.id || '',
+          // Include any other direct opportunity fields that might be at the root level
+          ...(opportunity.opportunity || {})
+        },
+        rfpDetails: {
+          ...defaultFormData.rfpDetails,
+          ...(opportunity.rfpDetails || {}),
+          // Map RFP details from root level if they exist
+          rfpTitle: opportunity.rfp_title || opportunity.rfpDetails?.rfpTitle || '',
+          rfpStatus: opportunity.rfp_status || opportunity.rfpDetails?.rfpStatus || 'Draft',
+          submissionDeadline: opportunity.submission_deadline || opportunity.rfpDetails?.submissionDeadline || '',
+          bidManager: opportunity.bid_manager || opportunity.rfpDetails?.bidManager || '',
+          submissionMode: opportunity.submission_mode || opportunity.rfpDetails?.submissionMode || '',
+          portalUrl: opportunity.portal_url || opportunity.rfpDetails?.portalUrl || '',
+          qaLogs: Array.isArray(opportunity.qa_logs)
+            ? opportunity.qa_logs
+            : (Array.isArray(opportunity.rfpDetails?.qaLogs)
+              ? opportunity.rfpDetails.qaLogs
+              : [])
+        },
+        sowDetails: {
+          ...defaultFormData.sowDetails,
+          ...(opportunity.sowDetails || {}),
+          // Map SOW details from root level if they exist
+          sowTitle: opportunity.sow_title || opportunity.sowDetails?.sowTitle || '',
+          sowStatus: opportunity.sow_status || opportunity.sowDetails?.sowStatus || 'Draft',
+          contractValue: opportunity.contract_value || opportunity.sowDetails?.contractValue || 0,
+          currency: opportunity.currency || opportunity.sowDetails?.currency || 'USD',
+          targetKickoffDate: opportunity.target_kickoff_date || opportunity.sowDetails?.targetKickoffDate || '',
+          linkedProposalRef: opportunity.linked_proposal_ref || opportunity.sowDetails?.linkedProposalRef || '',
+          scopeOverview: opportunity.scope_overview || opportunity.sowDetails?.scopeOverview || ''
+        },
+        rfpDocuments: Array.isArray(opportunity.rfpDocuments)
+          ? opportunity.rfpDocuments
+          : [],
+        sowDocuments: Array.isArray(opportunity.sowDocuments)
+          ? opportunity.sowDocuments
+          : []
+      };
+      setFormData(newFormData);
+    }
+  }, [opportunity]);
 
   const updateOpportunityData = (field, value) => {
     setFormData(prev => ({
@@ -642,27 +677,21 @@ useEffect(() => {
   };
 
   // Helper function to get user display name
-  const getUserDisplayName = (userId) => {
-    if (!userId) return 'Select a user';
+  const getUserName = (userId) => {
+    if (!userId) return '';
     
-    // First check if we have the name directly in form data
-    if (userId === formData.opportunity.sales_owner && formData.opportunity.sales_owner_name) {
+    // Check if we have the name in form data
+    if (formData.opportunity.sales_owner === userId) {
       return formData.opportunity.sales_owner_name;
     }
-    if (userId === formData.opportunity.technical_poc && formData.opportunity.technical_poc_name) {
+    if (formData.opportunity.technical_poc === userId) {
       return formData.opportunity.technical_poc_name;
     }
-    if (userId === formData.opportunity.presales_poc && formData.opportunity.presales_poc_name) {
+    if (formData.opportunity.presales_poc === userId) {
       return formData.opportunity.presales_poc_name;
     }
     
-    // Fall back to finding in users array
-    const user = users.find(u => 
-      String(u.id) === String(userId) || 
-      String(u._id) === String(userId)
-    );
-    
-    return user ? (user.full_name || user.name || user.email || `User ${user.id || user._id}`) : 'Select a user';
+    return `User ${userId}`;
   };
 
   return (
@@ -871,64 +900,53 @@ useEffect(() => {
                   </div>
 
                   {/* Type */}
-{/* Type */}
-{/* Type Dropdown - Direct Version */}
-<div>
-  <Label htmlFor="type">Type <span className="text-red-600">*</span></Label>
-  <Select
-    value={formData.opportunity.type || opportunity?.opportunity_type || ''}
-    onValueChange={(value) => {
-      updateOpportunityData('type', value);
-    }}
-    required
-  >
-    <SelectTrigger className="w-full">
-      <SelectValue placeholder="Select type">
-        {formData.opportunity.type || opportunity?.opportunity_type || 'Select type'}
-      </SelectValue>
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="New Business">New Business</SelectItem>
-      <SelectItem value="Existing Business">Existing Business</SelectItem>
-      <SelectItem value="Upsell">Upsell</SelectItem>
-      <SelectItem value="Renewal">Renewal</SelectItem>
-      <SelectItem value="Cross-sell">Cross-sell</SelectItem>
-      <SelectItem value="Referral">Referral</SelectItem>
-    </SelectContent>
-  </Select>
-  {/* <div className="mt-1 text-xs text-gray-500">
-    {formData.opportunity.type ? `Selected: ${formData.opportunity.type}` : 
-     opportunity?.opportunity_type ? `From API: ${opportunity.opportunity_type}` : 
-     'No value set'}
-  </div> */}
-</div>
+                  <div>
+                    <Label htmlFor="type">Type <span className="text-red-600">*</span></Label>
+                    <Select
+                      value={formData.opportunity.type || opportunity?.opportunity_type || ''}
+                      onValueChange={(value) => {
+                        updateOpportunityData('type', value);
+                      }}
+                      required
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select type">
+                          {formData.opportunity.type || opportunity?.opportunity_type || 'Select type'}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="New Business">New Business</SelectItem>
+                        <SelectItem value="Existing Business">Existing Business</SelectItem>
+                        <SelectItem value="Upsell">Upsell</SelectItem>
+                        <SelectItem value="Renewal">Renewal</SelectItem>
+                        <SelectItem value="Cross-sell">Cross-sell</SelectItem>
+                        <SelectItem value="Referral">Referral</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   {/* Lead Source */}
-                  {/* Lead Source Dropdown - Fixed Direct Version */}
-<div>
-  <Label htmlFor="leadSource">Lead Source <span className="text-red-600">*</span></Label>
-  <Select
-    value={formData.opportunity.leadSource || opportunity?.lead_source || ''}
-    onValueChange={(value) => updateOpportunityData('leadSource', value)}
-    required
-  >
-    <SelectTrigger>
-      <SelectValue placeholder="Select lead source">
-        {formData.opportunity.leadSource || opportunity?.lead_source || 'Select lead source'}
-      </SelectValue>
-    </SelectTrigger>
-    <SelectContent>
-      {LEAD_SOURCES.map((source) => (
-        <SelectItem key={source} value={source}>
-          {source}
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-  {/* <div className="mt-1 text-xs text-gray-500">
-    Current value: {formData.opportunity.leadSource || opportunity?.lead_source || 'Not set'}
-  </div> */}
-</div>
+                  <div>
+                    <Label htmlFor="leadSource">Lead Source <span className="text-red-600">*</span></Label>
+                    <Select
+                      value={formData.opportunity.leadSource || opportunity?.lead_source || ''}
+                      onValueChange={(value) => updateOpportunityData('leadSource', value)}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select lead source">
+                          {formData.opportunity.leadSource || opportunity?.lead_source || 'Select lead source'}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LEAD_SOURCES.map((source) => (
+                          <SelectItem key={source} value={source}>
+                            {source}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   {/* Partner Organization (Conditional) */}
                   {formData.opportunity.leadSource === 'Partner Organization' && (
@@ -959,82 +977,41 @@ useEffect(() => {
                   )}
 
                   {/* Sales Owner */}
-{/* Sales Owner Dropdown - Option 1 Fix */}
-<div>
-  <Label htmlFor="sales_owner">Sales Owner</Label>
-  
-  <Select
-    value={formData.opportunity.sales_owner || ''}
-    onValueChange={(value) => {
-      updateOpportunityData('sales_owner', value);
-      
-      const selectedUser = users.find(u => 
-        String(u.id) === String(value) || 
-        String(u._id) === String(value)
-      );
-      
-      if (selectedUser) {
-        updateOpportunityData('sales_owner_name', 
-          selectedUser.full_name || selectedUser.name || selectedUser.email || `User ${selectedUser.id || selectedUser._id}`
-        );
-      }
-    }}
-  >
-    <SelectTrigger>
-      <SelectValue placeholder="Select sales owner">
-        {formData.opportunity.sales_owner_name || 'Select sales owner'}
-      </SelectValue>
-    </SelectTrigger>
-    <SelectContent>
-      {isLoadingUsers ? (
-        <div className="p-2 text-center">
-          <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-          <p className="text-sm text-muted-foreground mt-1">Loading users...</p>
-        </div>
-      ) : users.length > 0 ? (
-        users.map((user) => {
-          const userId = user.id || user._id;
-          // Skip users without ID
-          if (!userId || userId === '') return null;
-          
-          return (
-            <SelectItem key={userId} value={String(userId)}>
-              {user.full_name || user.name || user.email || `User ${userId}`}
-            </SelectItem>
-          );
-        })
-      ) : (
-        <div className="p-2 text-center text-sm text-muted-foreground">
-          No users found
-        </div>
-      )}
-    </SelectContent>
-  </Select>
-</div>
-                  {/* Technical POC */}
                   <div>
-                    <Label htmlFor="technical_poc">Technical POC</Label>
+                    <Label htmlFor="sales_owner">Sales Owner</Label>
                     <Select
-                      value={formData.opportunity.technical_poc || ''}
+                      value={formData.opportunity.sales_owner || ''}
                       onValueChange={(value) => {
-                        updateOpportunityData('technical_poc', value);
-                        // Also update the name when a user is selected
-                        if (value) {
-                          const selectedUser = users.find(u => 
-                            String(u.id) === String(value) || 
-                            String(u._id) === String(value)
-                          );
-                          if (selectedUser) {
-                            updateOpportunityData('technical_poc_name', 
-                              selectedUser.full_name || selectedUser.name || selectedUser.email || `User ${selectedUser.id || selectedUser._id}`
-                            );
-                          }
+                        const selectedOwner = users.find(user => 
+                          String(user.id) === String(value) || 
+                          String(user._id) === String(value)
+                        );
+                        
+                        if (selectedOwner) {
+                          setFormData(prev => ({
+                            ...prev,
+                            opportunity: {
+                              ...prev.opportunity,
+                              sales_owner: String(selectedOwner.id || selectedOwner._id),
+                              sales_owner_name: selectedOwner.full_name || 
+                                              selectedOwner.name || 
+                                              selectedOwner.email || 
+                                              `User ${selectedOwner.id || selectedOwner._id}`
+                            }
+                          }));
                         }
                       }}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select technical POC">
-                          {getUserDisplayName(formData.opportunity.technical_poc)}
+                        <SelectValue placeholder="Select sales owner">
+                          {formData.opportunity.sales_owner_name || 
+                           (users.length > 0 && formData.opportunity.sales_owner
+                             ? (users.find(user => 
+                                  String(user.id) === String(formData.opportunity.sales_owner) || 
+                                  String(user._id) === String(formData.opportunity.sales_owner)
+                                )?.full_name || `User ${formData.opportunity.sales_owner}`)
+                             : 'Select sales owner'
+                          )}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -1046,6 +1023,72 @@ useEffect(() => {
                         ) : users.length > 0 ? (
                           users.map((user) => {
                             const userId = user.id || user._id;
+                            if (!userId) return null;
+                            
+                            return (
+                              <SelectItem key={userId} value={String(userId)}>
+                                {user.full_name || user.name || user.email || `User ${userId}`}
+                              </SelectItem>
+                            );
+                          })
+                        ) : (
+                          <div className="p-2 text-center text-sm text-muted-foreground">
+                            No users found
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Technical POC */}
+                  <div>
+                    <Label htmlFor="technical_poc">Technical POC</Label>
+                    <Select
+                      value={formData.opportunity.technical_poc || ''}
+                      onValueChange={(value) => {
+                        const selectedUser = users.find(user => 
+                          String(user.id) === String(value) || 
+                          String(user._id) === String(value)
+                        );
+                        
+                        if (selectedUser) {
+                          setFormData(prev => ({
+                            ...prev,
+                            opportunity: {
+                              ...prev.opportunity,
+                              technical_poc: String(selectedUser.id || selectedUser._id),
+                              technical_poc_name: selectedUser.full_name || 
+                                              selectedUser.name || 
+                                              selectedUser.email || 
+                                              `User ${selectedUser.id || selectedUser._id}`
+                            }
+                          }));
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select technical POC">
+                          {formData.opportunity.technical_poc_name || 
+                           (users.length > 0 && formData.opportunity.technical_poc
+                             ? (users.find(user => 
+                                  String(user.id) === String(formData.opportunity.technical_poc) || 
+                                  String(user._id) === String(formData.opportunity.technical_poc)
+                                )?.full_name || `User ${formData.opportunity.technical_poc}`)
+                             : 'Select technical POC'
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {isLoadingUsers ? (
+                          <div className="p-2 text-center">
+                            <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                            <p className="text-sm text-muted-foreground mt-1">Loading users...</p>
+                          </div>
+                        ) : users.length > 0 ? (
+                          users.map((user) => {
+                            const userId = user.id || user._id;
+                            if (!userId) return null;
+                            
                             return (
                               <SelectItem key={userId} value={String(userId)}>
                                 {user.full_name || user.name || user.email || `User ${userId}`}
@@ -1067,24 +1110,36 @@ useEffect(() => {
                     <Select
                       value={formData.opportunity.presales_poc || ''}
                       onValueChange={(value) => {
-                        updateOpportunityData('presales_poc', value);
-                        // Also update the name when a user is selected
-                        if (value) {
-                          const selectedUser = users.find(u => 
-                            String(u.id) === String(value) || 
-                            String(u._id) === String(value)
-                          );
-                          if (selectedUser) {
-                            updateOpportunityData('presales_poc_name', 
-                              selectedUser.full_name || selectedUser.name || selectedUser.email || `User ${selectedUser.id || selectedUser._id}`
-                            );
-                          }
+                        const selectedUser = users.find(user => 
+                          String(user.id) === String(value) || 
+                          String(user._id) === String(value)
+                        );
+                        
+                        if (selectedUser) {
+                          setFormData(prev => ({
+                            ...prev,
+                            opportunity: {
+                              ...prev.opportunity,
+                              presales_poc: String(selectedUser.id || selectedUser._id),
+                              presales_poc_name: selectedUser.full_name || 
+                                              selectedUser.name || 
+                                              selectedUser.email || 
+                                              `User ${selectedUser.id || selectedUser._id}`
+                            }
+                          }));
                         }
                       }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select presales POC">
-                          {getUserDisplayName(formData.opportunity.presales_poc)}
+                          {formData.opportunity.presales_poc_name || 
+                           (users.length > 0 && formData.opportunity.presales_poc
+                             ? (users.find(user => 
+                                  String(user.id) === String(formData.opportunity.presales_poc) || 
+                                  String(user._id) === String(formData.opportunity.presales_poc)
+                                )?.full_name || `User ${formData.opportunity.presales_poc}`)
+                             : 'Select presales POC'
+                          )}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -1096,6 +1151,8 @@ useEffect(() => {
                         ) : users.length > 0 ? (
                           users.map((user) => {
                             const userId = user.id || user._id;
+                            if (!userId) return null;
+                            
                             return (
                               <SelectItem key={userId} value={String(userId)}>
                                 {user.full_name || user.name || user.email || `User ${userId}`}
@@ -1350,46 +1407,16 @@ useEffect(() => {
 
                   <div>
                     <Label htmlFor="bidManager">Response Owner</Label>
-                    <Select
-                      value={formData.rfpDetails.bidManager}
-                      onValueChange={(value) => {
-                        updateRfpDetails('bidManager', value);
+                    <Input
+                      type="text"
+                      value={formData.rfpDetails.bidManager || ''}
+                      onChange={(e) => {
+                        updateRfpDetails('bidManager', e.target.value);
                       }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select response owner">
-                          {formData.rfpDetails.bidManager ?
-                            users.find(u => String(u.id || u._id) === String(formData.rfpDetails.bidManager))?.full_name ||
-                            'Unknown User'
-                            : null
-                          }
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {isLoadingUsers ? (
-                          <div className="p-2 text-center">
-                            <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                            <p className="text-sm text-muted-foreground mt-1">
-                              Loading users...
-                            </p>
-                          </div>
-                        ) : users.length > 0 ? (
-                          users.map((user) => {
-                            const userId = user.id || user._id;
-                            return (
-                              <SelectItem key={userId} value={String(userId)}>
-                                {user.full_name || user.name || user.email || `User ${userId}`}
-                              </SelectItem>
-                            );
-                          })
-                        ) : (
-                          <div className="p-2 text-center text-sm text-muted-foreground">
-                            No users found
-                          </div>
-                        )}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Enter bid manager name"
+                    />
                   </div>
+
                   {/* Submission Mode */}
                   <div>
                     <Label htmlFor="submissionMode">Submission Mode</Label>
