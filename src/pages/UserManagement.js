@@ -27,15 +27,17 @@ const fetchUsers = async () => {
     const response = await userService.getUsers();
     const allUsers = Array.isArray(response?.data) ? response.data : [];
     
-    // Filter users to only include those with "User" role
-    const usersData = allUsers.filter(user => {
-      const userRole = user.role_name || 
-                      (user.roles && user.roles[0]?.name) || 
-                      user.role;
-      return userRole && userRole.toLowerCase() === 'user';
-    });
+    // Map users and ensure role information is properly set
+    const usersWithRoles = allUsers.map(user => ({
+      ...user,
+      // Ensure role is properly set for display
+      role: user.role_name || 
+            (user.roles && user.roles[0]?.name) || 
+            user.role ||
+            'No Role Assigned'
+    }));
 
-    setUsers(usersData);
+    setUsers(usersWithRoles);
   } catch (error) {
     console.error('Error fetching users:', error);
     toast.error('Failed to load users');
@@ -108,11 +110,19 @@ const fetchUsers = async () => {
     {
       key: 'role', 
       header: 'Access Role',
-      render: (value) => (
-        <span className="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-700">
-          {value}
-        </span>
-      ),
+      render: (value, row) => {
+        // Get the role from the most reliable source
+        const role = row.role_name || 
+                    (row.roles && row.roles[0]?.name) || 
+                    row.role ||
+                    'No Role Assigned';
+                    
+        return (
+          <span className="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
+            {role}
+          </span>
+        );
+      },
     },
     {
       key: 'assigned_regions',
