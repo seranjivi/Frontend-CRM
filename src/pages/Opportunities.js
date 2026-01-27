@@ -281,10 +281,10 @@ const Opportunities = () => {
       const response = await opportunityService.getOpportunityById(opportunity.id);
       
       // Set the opportunity data for viewing with view mode flag
-      // For RFP stage, set isViewMode to false to show the Add button
+      // For RFP and SOW stages, set isViewMode to false to enable editing
       setEditingOpportunity({
         ...response.data,
-        isViewMode: isRFPStage ? false : true // Allow editing in RFP view
+        isViewMode: isRFPStage || isSOWStage ? false : true // Allow editing in both RFP and SOW views
       });
       
       setShowForm(true);
@@ -302,7 +302,7 @@ const Opportunities = () => {
       
       setEditingOpportunity({
         ...opportunity,
-        isViewMode: isRFPStage ? false : true // Allow editing in RFP view
+        isViewMode: isRFPStage || isSOWStage ? false : true // Allow editing in both RFP and SOW views
       });
       setShowForm(true);
     }

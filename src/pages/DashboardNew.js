@@ -66,12 +66,22 @@ const Dashboard = () => {
           { name: 'Won', value: conversionFunnel.won || 0, color: '#3b82f6' }
         ]);
 
-        // Update source distribution (only show sources with values > 0)
+        // Define a range of blue shades
+        const blueShades = [
+          '#2C6AA6', // Dark blue
+          '#3B82F6', // Blue
+          '#60A5FA', // Light blue
+          '#93C5FD', // Lighter blue
+          '#BFDBFE', // Very light blue
+          '#DBEAFE'  // Lightest blue
+        ];
+
+        // Update source distribution with different blue shades
         const filteredSources = sourceDistribution
           .filter(item => item.value > 0)
-          .map(item => ({
+          .map((item, index) => ({
             ...item,
-            color: `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`
+            color: blueShades[index % blueShades.length] // Cycle through blue shades
           }))
           .sort((a, b) => b.value - a.value);
 
@@ -339,14 +349,17 @@ const Dashboard = () => {
                     axisLine={false}
                   />
                   <Tooltip 
-                    formatter={(value) => [`${value}`, 'Count']}
-                    labelFormatter={(label) => `Source: ${label}`}
-                    contentStyle={{ 
-                      backgroundColor: 'white',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '0.5rem',
-                      padding: '0.5rem',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                    formatter={(value) => value}
+                    labelFormatter={(label) => label}
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-white p-2 border border-gray-200 rounded shadow-sm text-sm">
+                            <p className="font-medium">{label}: {payload[0].value}</p>
+                          </div>
+                        );
+                      }
+                      return null;
                     }}
                     cursor={{ fill: 'rgba(0, 0, 0, 0.02)' }}
                   />

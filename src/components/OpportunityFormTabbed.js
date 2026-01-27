@@ -457,6 +457,7 @@ const PIPELINE_STATUSES = [
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('Form submitted with data:', formData);
 
     try {
       // Handle SOW creation if in SOW tab
@@ -469,6 +470,7 @@ const PIPELINE_STATUSES = [
           // 1. First, get the RFP for this opportunity
           const opportunityId = opportunity?.id || opportunity?.opportunity?.id;
           const rfpResponse = await rfpService.getRFPsByOpportunityId(opportunityId);
+          console.log('RFP response:', rfpResponse);
 
           if (!rfpResponse.data || !rfpResponse.data.id) {
             throw new Error('No RFP found for this opportunity');
@@ -502,7 +504,7 @@ const PIPELINE_STATUSES = [
           if (onSuccess) onSuccess(result);
           if (onClose) onClose();
           // Redirect to /sows page after successful creation
-          window.location.href = '/sows';
+            window.location.href = '/sows';
 
         } catch (error) {
           console.error('Error in SOW creation flow:', error);
@@ -1943,22 +1945,31 @@ const PIPELINE_STATUSES = [
 
           {/* Form Actions */}
           <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-              {opportunity?.isViewMode ? 'Close' : 'Cancel'}
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose} 
+              disabled={loading}
+            >
+              {opportunity?.isViewMode && activeTab !== 'sow' ? 'Close' : 'Cancel'}
             </Button>
-            {!opportunity?.isViewMode && (
-              <Button type="submit" disabled={loading}>
+            
+            {/* Always show Add SOW button when in SOW tab, regardless of view mode */}
+            {(activeTab === 'sow' || !opportunity?.isViewMode) && (
+              <Button 
+                type="submit" 
+                disabled={loading || (activeTab === 'sow' && !formData.sowDetails?.sowTitle)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {opportunity ? 'Updating...' : 'Creating...'}
+                    {activeTab === 'sow' ? 'Adding...' : (opportunity ? 'Updating...' : 'Creating...')}
                   </>
                 ) : (
-                  <>
-                    {activeTab === 'sow' ? 'Add SOW' :
-                      activeTab === 'rfp' ? 'Add' :
-                        (opportunity ? 'Update' : 'Create')}
-                  </>
+                  activeTab === 'sow' ? 'Add SOW' :
+                  activeTab === 'rfp' ? 'Add' :
+                  (opportunity ? 'Update' : 'Create')
                 )}
               </Button>
             )}
