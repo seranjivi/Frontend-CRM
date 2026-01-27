@@ -23,15 +23,23 @@ const UserManagement = () => {
 
 const fetchUsers = async () => {
   try {
+    setLoading(true);
     const response = await userService.getUsers();
-    // Ensure we're working with an array
-    const usersData = Array.isArray(response) ? response : 
-                     (response?.data ? response.data : []);
+    const allUsers = Array.isArray(response?.data) ? response.data : [];
+    
+    // Filter users to only include those with "User" role
+    const usersData = allUsers.filter(user => {
+      const userRole = user.role_name || 
+                      (user.roles && user.roles[0]?.name) || 
+                      user.role;
+      return userRole && userRole.toLowerCase() === 'user';
+    });
+
     setUsers(usersData);
   } catch (error) {
     console.error('Error fetching users:', error);
-    toast.error('Failed to fetch users');
-    setUsers([]); // Ensure we set an empty array on error
+    toast.error('Failed to load users');
+    setUsers([]);
   } finally {
     setLoading(false);
   }
@@ -52,25 +60,28 @@ const fetchUsers = async () => {
 
   const handleEdit = async (user) => {
     try {
-      const response = await userService.getUserById(user.id);
-      const userData = response.data;  // Extract data from response      
-      // Transform the data to match the expected format
+      const userData = await userService.getUserById(user.id);
+      console.log('User data from API:', userData); // Debug log
+      
+      // Transform the data to match the expected format for the form
       const formattedUser = {
         ...userData,
         full_name: userData.full_name || userData.name || '',
         email: userData.email || '',
-        role: userData.role_id || userData.role?.id || '',
-        role_id: userData.role_id || userData.role?.id || '',
-        role_name: userData.role_name || userData.role?.name || '',
+        role: userData.role || (Array.isArray(userData.roles) ? userData.roles[0]?.id : ''),
+        role_id: userData.role_id || (Array.isArray(userData.roles) ? userData.roles[0]?.id : ''),
+        role_name: userData.role_name || (Array.isArray(userData.roles) ? userData.roles[0]?.name : ''),
         status: (userData.status || 'active').toLowerCase(),
-        regions: userData.regions || userData.assigned_regions || [],
+        assigned_regions: userData.regions || userData.assigned_regions || [],
         id: userData.id || user.id
       };
+      
+      console.log('Formatted user data:', formattedUser); // Debug log
       setEditingUser(formattedUser);
       setShowForm(true);
     } catch (error) {
       console.error('Error fetching user details:', error);
-      toast.error('Failed to fetch user details');
+      toast.error(`Failed to fetch user details: ${error.message || 'Unknown error'}`);
     }
   };
 

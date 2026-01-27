@@ -200,7 +200,12 @@ const PIPELINE_STATUSES = [
   };
 
   const [formData, setFormData] = useState(defaultFormData);
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState({
+    all: [],
+    technicalPocUsers: [],
+    salesPocUsers: [],
+    presalesPocUsers: []
+  });
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
   // Fetch users on component mount and update form data when users are loaded
@@ -209,34 +214,128 @@ const PIPELINE_STATUSES = [
       try {
         setIsLoadingUsers(true);
         const response = await getUsers();
-        const usersData = Array.isArray(response?.data) ? response.data : [];
-        setUsers(usersData);
+        const allUsers = Array.isArray(response?.data) ? response.data : [];
+        
+        // Filter users by role for each POC type
+        const filterUsersByRole = (roles) => {
+          if (!allUsers.length) return [];
+          
+          console.log('Filtering users with roles:', roles);
+          
+          // If no specific roles provided, return all users with any role
+          if (!roles || roles.length === 0) {
+            return allUsers.filter(user => {
+              const userRole = (user.role_name || (user.roles && user.roles[0]?.name) || '').toLowerCase();
+              const hasRole = userRole !== '';
+              console.log(`User ${user.full_name || user.email} - Role: ${userRole} - Has role: ${hasRole}`);
+              return hasRole;
+            });
+          }
+          
+          return allUsers.filter(user => {
+            // Handle both string role and array of roles
+            let userRoles = [];
+            
+            // Case 1: User has role_name
+            if (user.role_name) {
+              userRoles.push(user.role_name.toLowerCase());
+            }
+            
+            // Case 2: User has roles array
+            if (Array.isArray(user.roles)) {
+              user.roles.forEach(role => {
+                if (typeof role === 'string') {
+                  userRoles.push(role.toLowerCase());
+                } else if (role && typeof role === 'object') {
+                  if (role.name) userRoles.push(role.name.toLowerCase());
+                  if (role.role_name) userRoles.push(role.role_name.toLowerCase());
+                }
+              });
+            }
+            
+            // Case 3: User has a direct 'role' field
+            if (user.role) {
+              userRoles.push(user.role.toString().toLowerCase());
+            }
+            
+            // Remove duplicates
+            userRoles = [...new Set(userRoles)];
+            
+            const hasMatchingRole = roles.some(role => 
+              userRoles.some(userRole => userRole === role.toLowerCase())
+            );
+            
+            console.log(`User ${user.full_name || user.email} - Roles: ${userRoles.join(', ')} - Matches ${roles.join(', ')}: ${hasMatchingRole}`);
+            
+            return hasMatchingRole;
+          });
+        };
+
+        // For Technical POC, include users with 'user' role
+        const technicalPocUsers = filterUsersByRole(['user']);
+        
+        // For Sales POC, include sales head and any user with sales in their role
+        const salesPocUsers = filterUsersByRole(['sales head', 'sales']);
+        
+        // For Presales POC, include presales roles and any user with presales in their role
+        const presalesPocUsers = filterUsersByRole(['presales lead', 'presales member', 'presales']);
+        
+        console.log('Technical POC Users:', technicalPocUsers.map(u => u.full_name || u.email));
+        console.log('Sales POC Users:', salesPocUsers.map(u => u.full_name || u.email));
+        console.log('Presales POC Users:', presalesPocUsers.map(u => u.full_name || u.email));
+
+        setUsers({
+          all: allUsers,
+          technicalPocUsers,
+          salesPocUsers,
+          presalesPocUsers
+        });
 
         // After loading users, update the form data to ensure proper display of selected users
         if (opportunity) {
-          const updateUserField = (field, nameField) => {
+          const updateUserField = (field, nameField, userList) => {
             const userId = String(opportunity[field] || opportunity.opportunity?.[field] || '');
             const userName = opportunity[`${field}_name`] || opportunity.opportunity?.[`${field}_name`] || '';
             
-            if (userId && !userName) {
-              const selectedUser = usersData.find(user => 
+            if (userId) {
+              // First try to find in the filtered list
+              let selectedUser = userList.find(user => 
                 String(user.id) === userId || 
                 String(user._id) === userId
               );
+
+              // If not found, try in all users (for backward compatibility)
+              if (!selectedUser) {
+                selectedUser = allUsers.find(user => 
+                  String(user.id) === userId || 
+                  String(user._id) === userId
+                );
+              }
 
               if (selectedUser) {
                 setFormData(prev => ({
                   ...prev,
                   opportunity: {
                     ...prev.opportunity,
-                    [field]: userId,
+                    [field]: String(selectedUser.id || selectedUser._id),
                     [nameField]: selectedUser.full_name || 
                                 selectedUser.name || 
                                 selectedUser.email || 
                                 `User ${selectedUser.id || selectedUser._id}`
                   }
                 }));
+              } else if (userName) {
+                // Keep existing selection even if not in filtered list
+                setFormData(prev => ({
+                  ...prev,
+                  opportunity: {
+                    ...prev.opportunity,
+                    [field]: userId,
+                    [nameField]: userName
+                  }
+                }));
               } else if (userId) {
+                // Fallback for cases where we only have the ID
                 setFormData(prev => ({
                   ...prev,
                   opportunity: {
@@ -249,15 +348,20 @@ const PIPELINE_STATUSES = [
             }
           };
 
-          // Update sales_owner, technical_poc, and presales_poc fields
-          updateUserField('sales_owner', 'sales_owner_name');
-          updateUserField('technical_poc', 'technical_poc_name');
-          updateUserField('presales_poc', 'presales_poc_name');
+          // Update POC fields with their respective user lists
+          updateUserField('sales_owner', 'sales_owner_name', salesPocUsers);
+          updateUserField('technical_poc', 'technical_poc_name', technicalPocUsers);
+          updateUserField('presales_poc', 'presales_poc_name', presalesPocUsers);
         }
       } catch (error) {
         console.error('Error fetching users:', error);
         toast.error('Failed to load users');
-        setUsers([]);
+        setUsers({
+          all: [],
+          technicalPocUsers: [],
+          salesPocUsers: [],
+          presalesPocUsers: []
+        });
       } finally {
         setIsLoadingUsers(false);
       }
@@ -1096,41 +1200,38 @@ const PIPELINE_STATUSES = [
 
                   {/* Sales Owner */}
                   <div>
-                    <Label htmlFor="sales_owner">Sales Owner</Label>
+                    <Label htmlFor="sales_owner">Sales POC</Label>
                     <Select
                       value={formData.opportunity.sales_owner || ''}
                       onValueChange={(value) => {
                         if (opportunity?.isViewMode) return;
-                        const selectedOwner = users.find(user => 
+                        const selectedUser = users.salesPocUsers.find(user => 
                           String(user.id) === String(value) || 
                           String(user._id) === String(value)
                         );
 
-                        if (selectedOwner) {
+                        if (selectedUser) {
                           setFormData(prev => ({
                             ...prev,
                             opportunity: {
                               ...prev.opportunity,
-                              sales_owner: String(selectedOwner.id || selectedOwner._id),
-                              sales_owner_name: selectedOwner.full_name || 
-                                              selectedOwner.name || 
-                                              selectedOwner.email || 
-                                              `User ${selectedOwner.id || selectedOwner._id}`
+                              sales_owner: String(selectedUser.id || selectedUser._id),
+                              sales_owner_name: selectedUser.full_name || 
+                                              selectedUser.name || 
+                                              selectedUser.email || 
+                                              `User ${selectedUser.id || selectedUser._id}`
                             }
                           }));
                         }
                       }}
-                      disabled={opportunity?.isViewMode}
+                      disabled={opportunity?.isViewMode || isLoadingUsers}
                     >
                       <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
-                        <SelectValue placeholder="Select sales owner">
+                        <SelectValue placeholder={isLoadingUsers ? 'Loading users...' : 'Select sales POC'}>
                           {formData.opportunity.sales_owner_name || 
-                           (users.length > 0 && formData.opportunity.sales_owner
-                             ? (users.find(user => 
-                                  String(user.id) === String(formData.opportunity.sales_owner) || 
-                                  String(user._id) === String(formData.opportunity.sales_owner)
-                                )?.full_name || `User ${formData.opportunity.sales_owner}`)
-                             : 'Select sales owner'
+                           (formData.opportunity.sales_owner
+                             ? `User ${formData.opportunity.sales_owner}`
+                             : 'Select sales POC'
                           )}
                         </SelectValue>
                       </SelectTrigger>
@@ -1140,8 +1241,8 @@ const PIPELINE_STATUSES = [
                             <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                             <p className="text-sm text-muted-foreground mt-1">Loading users...</p>
                           </div>
-                        ) : users.length > 0 ? (
-                          users.map((user) => {
+                        ) : users.salesPocUsers.length > 0 ? (
+                          users.salesPocUsers.map((user) => {
                             const userId = user.id || user._id;
                             if (!userId) return null;
                             
@@ -1153,7 +1254,7 @@ const PIPELINE_STATUSES = [
                           })
                         ) : (
                           <div className="p-2 text-center text-sm text-muted-foreground">
-                            No users found
+                            No Sales Head users found
                           </div>
                         )}
                       </SelectContent>
@@ -1167,7 +1268,7 @@ const PIPELINE_STATUSES = [
                       value={formData.opportunity.technical_poc || ''}
                       onValueChange={(value) => {
                         if (opportunity?.isViewMode) return;
-                        const selectedUser = users.find(user => 
+                        const selectedUser = users.technicalPocUsers.find(user => 
                           String(user.id) === String(value) || 
                           String(user._id) === String(value)
                         );
@@ -1186,16 +1287,13 @@ const PIPELINE_STATUSES = [
                           }));
                         }
                       }}
-                      disabled={opportunity?.isViewMode}
+                      disabled={opportunity?.isViewMode || isLoadingUsers}
                     >
                       <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
-                        <SelectValue placeholder="Select technical POC">
+                        <SelectValue placeholder={isLoadingUsers ? 'Loading users...' : 'Select technical POC'}>
                           {formData.opportunity.technical_poc_name || 
-                           (users.length > 0 && formData.opportunity.technical_poc
-                             ? (users.find(user => 
-                                  String(user.id) === String(formData.opportunity.technical_poc) || 
-                                  String(user._id) === String(formData.opportunity.technical_poc)
-                                )?.full_name || `User ${formData.opportunity.technical_poc}`)
+                           (formData.opportunity.technical_poc
+                             ? `User ${formData.opportunity.technical_poc}`
                              : 'Select technical POC'
                           )}
                         </SelectValue>
@@ -1206,8 +1304,8 @@ const PIPELINE_STATUSES = [
                             <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                             <p className="text-sm text-muted-foreground mt-1">Loading users...</p>
                           </div>
-                        ) : users.length > 0 ? (
-                          users.map((user) => {
+                        ) : users.technicalPocUsers.length > 0 ? (
+                          users.technicalPocUsers.map((user) => {
                             const userId = user.id || user._id;
                             if (!userId) return null;
                             
@@ -1219,7 +1317,7 @@ const PIPELINE_STATUSES = [
                           })
                         ) : (
                           <div className="p-2 text-center text-sm text-muted-foreground">
-                            No users found
+                            No User role users found
                           </div>
                         )}
                       </SelectContent>
@@ -1233,7 +1331,7 @@ const PIPELINE_STATUSES = [
                       value={formData.opportunity.presales_poc || ''}
                       onValueChange={(value) => {
                         if (opportunity?.isViewMode) return;
-                        const selectedUser = users.find(user => 
+                        const selectedUser = users.presalesPocUsers.find(user => 
                           String(user.id) === String(value) || 
                           String(user._id) === String(value)
                         );
@@ -1252,16 +1350,13 @@ const PIPELINE_STATUSES = [
                           }));
                         }
                       }}
-                      disabled={opportunity?.isViewMode}
+                      disabled={opportunity?.isViewMode || isLoadingUsers}
                     >
                       <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
-                        <SelectValue placeholder="Select presales POC">
+                        <SelectValue placeholder={isLoadingUsers ? 'Loading users...' : 'Select presales POC'}>
                           {formData.opportunity.presales_poc_name || 
-                           (users.length > 0 && formData.opportunity.presales_poc
-                             ? (users.find(user => 
-                                  String(user.id) === String(formData.opportunity.presales_poc) || 
-                                  String(user._id) === String(formData.opportunity.presales_poc)
-                                )?.full_name || `User ${formData.opportunity.presales_poc}`)
+                           (formData.opportunity.presales_poc
+                             ? `User ${formData.opportunity.presales_poc}`
                              : 'Select presales POC'
                           )}
                         </SelectValue>
@@ -1272,8 +1367,8 @@ const PIPELINE_STATUSES = [
                             <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                             <p className="text-sm text-muted-foreground mt-1">Loading users...</p>
                           </div>
-                        ) : users.length > 0 ? (
-                          users.map((user) => {
+                        ) : users.presalesPocUsers.length > 0 ? (
+                          users.presalesPocUsers.map((user) => {
                             const userId = user.id || user._id;
                             if (!userId) return null;
                             
@@ -1285,7 +1380,7 @@ const PIPELINE_STATUSES = [
                           })
                         ) : (
                           <div className="p-2 text-center text-sm text-muted-foreground">
-                            No users found
+                            No Presales users found
                           </div>
                         )}
                       </SelectContent>
