@@ -94,7 +94,6 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
 
         // Fetch regions with countries
         const response = await masterDataService.getRegionsWithCountries();
-        console.log('Regions data response:', response);
         const regionsData = response?.data || [];
         setRegions(regionsData);
       } catch (error) {
@@ -110,14 +109,10 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
 
   // Debug effect to log formData.industry and client prop
   useEffect(() => {
-    console.log('formData.industry:', formData.industry);
-    console.log('client prop:', client);
   }, [formData.industry, client]);
 
   useEffect(() => {
-    if (client && users.length > 0) {
-      console.log('Client data in form:', client);
-      
+    if (client && users.length > 0) {      
       // Find the user ID that matches the account_owner name if account_owner is a string
       const getAccountOwnerId = () => {
         // If we already have a numeric ID, return it
@@ -141,9 +136,7 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
 
       // Process contacts from either client.contacts or client.contact_persons
       const processContacts = () => {
-        const contacts = client.contacts || client.contact_persons || [];
-        console.log('Processing contacts:', contacts);
-        
+        const contacts = client.contacts || client.contact_persons || [];        
         if (contacts.length > 0) {
           return contacts.map(contact => {
             const { countryCode, number } = parsePhoneNumber(contact.phone || '');
@@ -187,8 +180,6 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
         notes: client.notes || '',
         contact_persons: processContacts()
       };
-      console.log('Initial data:', initialData);
-
       // Set the selected country IDs from the addresses
       const countryIds = {};
       if (client.addresses) {
@@ -277,11 +268,9 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
   };
 
   const handleRegionChange = async (index, regionId) => {
-    console.log('handleRegionChange called with regionId:', regionId);
     const region = regions.find(r => r.id === Number(regionId) || r.name === regionId);
 
     if (region) {
-      console.log('Selected region found:', region);
       const updatedAddresses = [...formData.addresses];
       updatedAddresses[index].region = region.name;
       setFormData(prev => ({ ...prev, addresses: updatedAddresses }));
@@ -291,9 +280,7 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
       handleAddressChange(index, 'country', '');
 
       try {
-        console.log('Fetching countries for region ID:', region.id);
         const countriesData = await masterDataService.getCountriesByRegionId(region.id);
-        console.log('Countries data received:', countriesData);
         setCountries(countriesData);
       } catch (error) {
         console.error('Error in handleRegionChange:', error);
@@ -306,10 +293,8 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
   };
 
   const handleCountryChange = (index, countryName, countryId) => {
-    console.log('Country selected:', countryName);
     const selectedCountry = countries.find(c => c.name === countryName);
     if (selectedCountry) {
-      console.log('Selected country:', selectedCountry);
       // Update the selected country ID
       setSelectedCountryIds(prev => ({
         ...prev,
@@ -812,11 +797,9 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
                     value={address.region || ''}
                     onValueChange={async (value) => {
                       if (viewMode) return;
-                      console.log('handleRegionChange called with regionId:', value);
                       const region = regions.find(r => r.id === Number(value) || r.name === value);
 
                       if (region) {
-                        console.log('Selected region found:', region);
                         const updatedAddresses = [...formData.addresses];
                         updatedAddresses[index].region = region.name;
                         setFormData(prev => ({ ...prev, addresses: updatedAddresses }));
@@ -826,14 +809,9 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
                         handleAddressChange(index, 'country', '');
 
                         try {
-                          console.log('Fetching countries for region ID:', region.id);
                           const response = await masterDataService.getCountriesByRegionId(region.id);
-                          console.log('API response:', response);
-
                           // Extract countries from response.data
                           const countriesData = response?.data || [];
-                          console.log('Countries data:', countriesData);
-
                           // Map the data to the expected format
                           const formattedCountries = countriesData.map(country => ({
                             id: country.id,
@@ -842,7 +820,6 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
                             phone_code: country.phone_code
                           }));
 
-                          console.log('Formatted countries:', formattedCountries);
                           setCountries(formattedCountries);
                         } catch (error) {
                           console.error('Error in handleRegionChange:', error);
@@ -881,10 +858,8 @@ const ClientForm = ({ client, onClose, onSuccess, viewMode = false }) => {
                     value={address.country || ''}
                     onValueChange={(value) => {
                       if (viewMode) return;
-                      console.log('Country selected:', value);
                       const selectedCountry = countries.find(c => c.name === value);
                       if (selectedCountry) {
-                        console.log('Selected country:', selectedCountry);
                         handleAddressChange(index, 'country', selectedCountry.name);
                       }
                     }}

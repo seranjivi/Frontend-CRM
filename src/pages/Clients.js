@@ -23,7 +23,6 @@ const Clients = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isViewMode, setIsViewMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [clientNames, setClientNames] = useState([]);
   const [visibleCount, setVisibleCount] = useState(10);
   const [loadMoreRef, inView] = useInView({
     threshold: 0.1,
@@ -33,17 +32,25 @@ const Clients = () => {
     region: '',
     status: '',
     client_tier: '',
+    account_owner: '',
     date_range: 'all',
-    search: '',
-    client_name: ''
+    search: ''
   });
   const fileInputRef = useRef(null);
 
   // Get unique values for filters
+  // Get unique account owners
+  const accountOwners = [...new Set(
+    clients
+      .map(client => client.account_owner || client.account_owner_id || client.user_id || '')
+      .filter(Boolean)
+  )].sort();
+
   const filterOptions = {
     region: [...new Set(clients.map(client => client.region).filter(Boolean))],
     status: ['All Status', 'Active', 'Inactive'],
-    client_tier: ['A', 'B', 'C', 'D']
+    client_tier: ['A', 'B', 'C', 'D'],
+    account_owners: ['All Owners', ...accountOwners]
   };
 
   // Filter clients based on all active filters
@@ -83,10 +90,6 @@ const Clients = () => {
       (client.industry && client.industry.toLowerCase().includes(filters.search.toLowerCase())) ||
       (client.customer_type && client.customer_type.toLowerCase().includes(filters.search.toLowerCase()));
 
-    // Client name dropdown filter (exact match)
-    const matchesClientName = !filters.client_name || 
-      (client.client_name && client.client_name === filters.client_name);
-
     // Status filter (case-insensitive and flexible with status values)
     const clientStatus = String(client.status || client.client_status || '').toLowerCase();
     const matchesStatus = !filters.status || 
@@ -95,12 +98,20 @@ const Clients = () => {
       (filters.status === 'Active' && clientStatus !== 'inactive') ||
       (filters.status === 'Inactive' && clientStatus === 'inactive');
 
+    // Check account owner filter
+    const matchesAccountOwner = !filters.account_owner || 
+      filters.account_owner === '' ||
+      filters.account_owner === 'All Owners' ||
+      client.account_owner === filters.account_owner ||
+      client.account_owner_id === filters.account_owner ||
+      client.user_id === filters.account_owner;
+
     return (
       matchesSearch &&
-      matchesClientName &&
       (filters.region === '' || client.region === filters.region) &&
       matchesStatus &&
       (filters.client_tier === '' || client.client_tier === filters.client_tier) &&
+      (filters.account_owner === '' || matchesAccountOwner) &&
       dateInRange
     );
   });
@@ -117,9 +128,9 @@ const Clients = () => {
       region: '',
       status: '',
       client_tier: '',
+      account_owner: '',
       date_range: 'all',
-      search: '',
-      client_name: ''
+      search: ''
     });
   };
 
@@ -130,7 +141,7 @@ const Clients = () => {
   useEffect(() => {
     if (clients.length > 0) {
       const names = [...new Set(clients.map(c => c.client_name).filter(Boolean))];
-      setClientNames(names);
+      // setClientNames(names);
     }
   }, [clients]);
 
@@ -148,12 +159,12 @@ const Clients = () => {
 
   // Filter clients based on search query
   const filteredClientNames = useMemo(() => {
-    return clientNames
+    return []
       .filter(name => 
         name.toLowerCase().includes(searchQuery.toLowerCase())
       )
       .slice(0, visibleCount);
-  }, [clientNames, searchQuery, visibleCount]);
+  }, [searchQuery, visibleCount]);
 
   const fetchClients = async () => {
     try {
@@ -193,19 +204,13 @@ const Clients = () => {
     
     try {
       setLoadingClientDetails(true); // Start loading
-      console.log('Client object (view):', client);
       const clientId = client.id || client._id || client.client_id;
       if (!clientId) {
         throw new Error('Client ID not found');
       }
-      console.log('Using client ID (view):', clientId);
-      const response = await clientService.getClientById(clientId);
-      console.log('API Response (view):', response);
-      
+      const response = await clientService.getClientById(clientId);      
       if (response) {
-        const clientData = response.data || response;
-        console.log('Client data (view):', clientData);
-        
+        const clientData = response.data || response;        
         const formData = {
           id: clientData.id || clientData._id || clientData.client_id,
           client_name: clientData.client_name || '',
@@ -260,19 +265,13 @@ const Clients = () => {
     
     try {
       setLoadingClientDetails(true); // Start loading
-      console.log('Client object (edit):', client);
       const clientId = client.id || client._id || client.client_id;
       if (!clientId) {
         throw new Error('Client ID not found');
       }
-      console.log('Using client ID (edit):', clientId);
-      const response = await clientService.getClientById(clientId);
-      console.log('API Response (edit):', response);
-      
+      const response = await clientService.getClientById(clientId);      
       if (response) {
         const clientData = response.data || response;
-        console.log('Client data (edit):', clientData);
-        
         const formData = {
           id: clientData.id || clientData._id || clientData.client_id,
           client_name: clientData.client_name || '',
@@ -576,46 +575,6 @@ const Clients = () => {
               )} */}
             </div>
             <Select 
-              value={filters.client_name || ''}
-              onValueChange={(value) => {
-                handleFilterChange('client_name', value === 'All Clients' ? '' : value);
-                setSearchQuery(''); // Reset search when an item is selected
-              }}
-            >
-              <SelectTrigger className="w-[200px] h-9 text-sm">
-                <SelectValue placeholder="Client Name" />
-              </SelectTrigger>
-              <SelectContent className="p-0 w-[var(--radix-select-trigger-width)]">
-                <div className="sticky top-0 bg-white p-2 border-b">
-                  <Input
-                    placeholder="Search client..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-8 text-sm w-full"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </div>
-                <div className="max-h-[300px] overflow-y-auto">
-                  <SelectItem value="All Clients">All Clients</SelectItem>
-                  {filteredClientNames.map((name, index) => (
-                    <SelectItem 
-                      key={name} 
-                      value={name}
-                      ref={index === filteredClientNames.length - 1 ? loadMoreRef : null}
-                    >
-                      {name}
-                    </SelectItem>
-                  ))}
-                  {filteredClientNames.length === 0 && (
-                    <div className="py-2 text-center text-sm text-gray-500">
-                      No clients found
-                    </div>
-                  )}
-                  <div ref={loadMoreRef} className="h-4 w-full" />
-                </div>
-              </SelectContent>
-            </Select>
-            <Select 
               value={filters.status} 
               onValueChange={(value) => handleFilterChange('status', value)}
             >
@@ -626,6 +585,22 @@ const Clients = () => {
                 {filterOptions.status.map((status) => (
                   <SelectItem key={status} value={status}>
                     {status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select 
+              value={filters.account_owner} 
+              onValueChange={(value) => handleFilterChange('account_owner', value)}
+            >
+              <SelectTrigger className="w-[150px] h-9 text-sm">
+                <SelectValue placeholder="All Owners" />
+              </SelectTrigger>
+              <SelectContent>
+                {filterOptions.account_owners.map((owner) => (
+                  <SelectItem key={owner} value={owner}>
+                    {owner}
                   </SelectItem>
                 ))}
               </SelectContent>

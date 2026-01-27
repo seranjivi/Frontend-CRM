@@ -93,7 +93,7 @@ const sowService = {
   // Delete SOW
   deleteSOW: async (id) => {
     try {
-      await api.delete(`/api/sows/${id}`);
+      await api.delete(`/sows/${id}`);
     } catch (error) {
       console.error(`Error deleting SOW ${id}:`, error);
       throw error;

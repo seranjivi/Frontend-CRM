@@ -153,17 +153,17 @@ const SOWs = () => {
 
   const handleImportSOW = () => {
     // Handle import SOW
-    console.log('Import SOW');
   };
 
   const handleDelete = async (sow) => {
     if (window.confirm(`Are you sure you want to delete ${sow.title}?`)) {
       try {
         setLoading(true);
-        // TODO: Replace with actual API call
-        // await sowService.deleteSOW(sow.id);
-        // Refresh the SOWs list
-        // fetchSOWs();
+        // Extract numeric ID from SOW-{id} format
+        const numericId = sow.id.replace('SOW-', '');
+        await sowService.deleteSOW(numericId);
+        // Refresh the SOWs list after successful deletion
+        fetchSOWs();
         toast.success('SOW deleted successfully');
       } catch (error) {
         console.error('Error deleting SOW:', error);

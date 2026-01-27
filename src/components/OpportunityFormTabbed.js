@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import MultiFileUpload from './attachments/MultiFileUpload';
 import DateField from './DateField';
 import PropTypes from 'prop-types';
+import { FileText, X } from 'lucide-react';
 
 const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = false, showOnlyDetails = false, showOnlySOW = false }) => {
   // Reset form when opportunity changes
@@ -51,6 +52,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   const [searchTerm, setSearchTerm] = useState('');
   const [visibleClients, setVisibleClients] = useState(10);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+const [selectedFiles, setSelectedFiles] = useState([]);
 
   // Filter clients based on search term
   const filteredClients = useMemo(() => {
@@ -64,11 +66,11 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   }, [clients, searchTerm]);
 
   const LEAD_SOURCES = [
-    'Advertisement', 'Cold Call', 'Employee Referral', 'External Referral',
-    'Online Store', 'Partner Organization', 'Partner Individual',
-    'Public Relations', 'Sales Email Alias', 'Seminar Partner',
-    'Internal Seminar', 'Trade Show', 'Web Download', 'Web Research', 'Chat', 'Portal'
-  ];
+  'Advertisement', 'Cold Call', 'Employee Referral', 'External Referral',
+  'Online Store', 'Partner Organization', 'Partner Individual',
+  'Public Relations', 'Sales Email Alias', 'Seminar Partner',
+  'Internal Seminar', 'Trade Show', 'Web Download', 'Web Research', 'Chat', 'Portal'
+];
 
   const CURRENCIES = [
     { code: 'USD', symbol: '$', name: 'US Dollar' },
@@ -77,15 +79,24 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     { code: 'GBP', symbol: '£', name: 'British Pound' }
   ];
 
-  const OPPORTUNITY_TYPES = ['New Business', 'Existing Business', 'Upsell', 'Renewal', 'Cross-sell', 'Referral'];
-  const PIPELINE_STATUSES = [
+const OPPORTUNITY_TYPES = [
+  'New Business', 
+  'Existing Business', 
+  'Upsell', 
+  'Renewal', 
+  'Cross-sell', 
+  'Referral'
+];  
+const PIPELINE_STATUSES = [
     'Proposal Work-in-Progress',
     'Proposal Review',
     'Price Negotiation',
     'Won',
     'Lost'
   ];
+  const RFP_TYPES = ['RFP'];
   const RFP_STATUSES = ['Draft', 'Submitted', 'Won', 'Lost', 'In Progress'];
+  const SUBMISSION_MODES = ['paid', 'free'];
   const SOW_STATUSES = ['Draft', 'Submitted', 'Won', 'Lost', 'In Progress'];
 
   const TRIAGED_OPTIONS = [
@@ -93,6 +104,18 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     { value: 'Hold', label: 'Hold (Lead)' },
     { value: 'Drop', label: 'Drop (No-Go)' }
   ];
+  
+  // Helper function to normalize triage status
+  const normalizeTriageStatus = (status) => {
+    if (!status) return 'Hold';
+    const normalized = status.toString().trim();
+    if (['Proceed', 'proceed', 'PROCEED'].includes(normalized)) return 'Proceed';
+    if (['Drop', 'drop', 'DROP'].includes(normalized)) return 'Drop';
+    if (['Hold', 'hold', 'HOLD'].includes(normalized)) return 'Hold';
+    // If we get an unexpected value, default to Hold but log a warning
+    console.warn('Unexpected triage status value:', status, '- defaulting to Hold');
+    return 'Hold';
+  };
 
   const getWinProbability = (status) => {
     const statusProbabilities = {
@@ -133,6 +156,9 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
       sales_owner: '',
       technical_poc: '',
       presales_poc: '',
+      sales_owner_name: '',
+      technical_poc_name: '',
+      presales_poc_name: '',
       amount: '',
       currency: 'USD',
       leadSource: '',
@@ -147,11 +173,17 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     },
     rfpDetails: {
       rfpTitle: '',
+      rfpType: 'RFP',
       rfpStatus: 'Draft',
+      rfbDescription: '',
+      solutionDescription: '',
       submissionDeadline: '',
       bidManager: '',
       submissionMode: '',
       portalUrl: '',
+      questionSubmissionDate: '',
+      responseSubmissionDate: '',
+      comments: '',
       qaLogs: []
     },
     sowDetails: {
@@ -171,61 +203,89 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   const [users, setUsers] = useState([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
-  // Fetch users for dropdowns
+  // Fetch users on component mount and update form data when users are loaded
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         setIsLoadingUsers(true);
         const response = await getUsers();
-        // Log the raw response for debugging
-        console.log('Users API Response:', response);
+        const usersData = Array.isArray(response?.data) ? response.data : [];
+        setUsers(usersData);
 
-        // Map the response to ensure we have the correct structure
-        const formattedUsers = Array.isArray(response)
-          ? response
-          : Array.isArray(response?.data)
-            ? response.data
-            : [];
+        // After loading users, update the form data to ensure proper display of selected users
+        if (opportunity) {
+          const updateUserField = (field, nameField) => {
+            const userId = String(opportunity[field] || opportunity.opportunity?.[field] || '');
+            const userName = opportunity[`${field}_name`] || opportunity.opportunity?.[`${field}_name`] || '';
+            
+            if (userId && !userName) {
+              const selectedUser = usersData.find(user => 
+                String(user.id) === userId || 
+                String(user._id) === userId
+              );
 
-        console.log('Formatted Users:', formattedUsers);
-        console.log('Current formData.opportunity:', {
-          sales_owner: formData.opportunity.sales_owner,
-          technical_poc: formData.opportunity.technical_poc,
-          presales_poc: formData.opportunity.presales_poc
-        });
+              if (selectedUser) {
+                setFormData(prev => ({
+                  ...prev,
+                  opportunity: {
+                    ...prev.opportunity,
+                    [field]: userId,
+                    [nameField]: selectedUser.full_name || 
+                                selectedUser.name || 
+                                selectedUser.email || 
+                                `User ${selectedUser.id || selectedUser._id}`
+                  }
+                }));
+              } else if (userId) {
+                setFormData(prev => ({
+                  ...prev,
+                  opportunity: {
+                    ...prev.opportunity,
+                    [field]: userId,
+                    [nameField]: `User ${userId}`
+                  }
+                }));
+              }
+            }
+          };
 
-        // Log if we can find the selected users
-        if (formData.opportunity.sales_owner) {
-          const salesOwner = formattedUsers.find(u => u.id === formData.opportunity.sales_owner || u._id === formData.opportunity.sales_owner);
-          console.log('Found sales owner:', salesOwner);
+          // Update sales_owner, technical_poc, and presales_poc fields
+          updateUserField('sales_owner', 'sales_owner_name');
+          updateUserField('technical_poc', 'technical_poc_name');
+          updateUserField('presales_poc', 'presales_poc_name');
         }
-        if (formData.opportunity.technical_poc) {
-          const techPOC = formattedUsers.find(u => u.id === formData.opportunity.technical_poc || u._id === formData.opportunity.technical_poc);
-          console.log('Found technical POC:', techPOC);
-        }
-        if (formData.opportunity.presales_poc) {
-          const presalesPOC = formattedUsers.find(u => u.id === formData.opportunity.presales_poc || u._id === formData.opportunity.presales_poc);
-          console.log('Found presales POC:', presalesPOC);
-        }
-
-        setUsers(formattedUsers);
       } catch (error) {
         console.error('Error fetching users:', error);
         toast.error('Failed to load users');
+        setUsers([]);
       } finally {
         setIsLoadingUsers(false);
       }
     };
 
     fetchUsers();
-  }, []);
+  }, [opportunity]); // Add opportunity to dependency array
+
+  // Debug effect to log triaged status changes and form data
+  useEffect(() => {
+    if (opportunity) {
+      const normalized = normalizeTriageStatus(opportunity.triaged_status);      
+      // Force update the form data with the normalized value
+      if (normalized && normalized !== formData.opportunity.triaged) {
+        updateOpportunityData('triaged', normalized);
+      }
+    }
+  }, [opportunity, formData.opportunity.triaged]);
+
+  // Log form data changes
+  useEffect(() => {
+  }, [formData.opportunity.triaged]);
 
   // Update form data when opportunity prop changes
   useEffect(() => {
     if (opportunity) {
-      console.log('Raw opportunity data:', opportunity); // Debug log
-
-      setFormData({
+      // Create new form data object
+      const newFormData = {
         opportunity: {
           ...defaultFormData.opportunity,
           // Map API fields to form fields
@@ -238,22 +298,39 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
             (opportunity.opportunity?.startDate ?
               new Date(opportunity.opportunity.startDate).toISOString().split('T')[0] :
               ''),
-          sales_owner: opportunity.sales_owner || opportunity.opportunity?.sales_owner || '',
-          technical_poc: opportunity.technical_poc || opportunity.opportunity?.technical_poc || '',
-          presales_poc: opportunity.presales_poc || opportunity.opportunity?.presales_poc || '',
+          
+          // Handle sales owner data
+          sales_owner: String(opportunity.sales_owner || opportunity.opportunity?.sales_owner || ''),
+          sales_owner_name: opportunity.sales_owner_name || opportunity.opportunity?.sales_owner_name || 
+                           (opportunity.sales_owner ? `User ${opportunity.sales_owner}` : ''),
+          technical_poc: String(opportunity.technical_poc || ''), // Convert to string
+          technical_poc_name: opportunity.technical_poc_name || '',
+          presales_poc: String(opportunity.presales_poc || ''), // Convert to string
+          presales_poc_name: opportunity.presales_poc_name || '',
+          
           amount: opportunity.amount || opportunity.opportunity?.amount || '',
-          currency: opportunity.currency || opportunity.opportunity?.currency || 'USD',
-          leadSource: opportunity.lead_source || opportunity.opportunity?.leadSource || '',
-          type: opportunity.type || opportunity.opportunity?.type || 'New Business',
-          triaged: opportunity.triaged_status || opportunity.opportunity?.triaged || 'Hold',
+          currency: opportunity.amount_currency || opportunity.currency || opportunity.opportunity?.currency || 'USD',
+          
+          // FIX: Remove duplicate leadSource line
+          leadSource: opportunity.lead_source || opportunity.leadSource || opportunity.opportunity?.leadSource || '',
+          
+          // FIX: Make sure these are properly mapped
+          type: opportunity.opportunity_type || opportunity.type || opportunity.opportunity?.type || 'New Business',
+          // Explicitly prioritize triaged_status from the API response
+          // Ensure we're using the normalized value directly
+          triaged: opportunity.triaged_status ? 
+            normalizeTriageStatus(opportunity.triaged_status) : 
+            (opportunity.opportunity?.triaged_status ? 
+              normalizeTriageStatus(opportunity.opportunity.triaged_status) : 
+              (opportunity.triaged ? 
+                normalizeTriageStatus(opportunity.triaged) : 
+                'Hold')),
           pipelineStatus: opportunity.pipeline_status || opportunity.opportunity?.pipelineStatus || 'Proposal Work-in-Progress',
           winProbability: opportunity.win_probability || opportunity.opportunity?.winProbability || 20,
-          nextSteps: Array.isArray(opportunity.nextSteps)
-            ? opportunity.nextSteps
-            : (Array.isArray(opportunity.opportunity?.nextSteps)
-              ? opportunity.opportunity.nextSteps
-              : []),
-          createdBy: opportunity.created_by || opportunity.opportunity?.createdBy || 'System',
+          nextSteps: Array.isArray(opportunity.next_steps) ? opportunity.next_steps : 
+                    (Array.isArray(opportunity.nextSteps) ? opportunity.nextSteps :
+                    (Array.isArray(opportunity.opportunity?.nextSteps) ? opportunity.opportunity.nextSteps : [])),
+          createdBy: opportunity.created_by || opportunity.user_name || opportunity.opportunity?.createdBy || 'System',
           description: opportunity.description || opportunity.opportunity?.description || '',
           id: opportunity.id || opportunity.opportunity?.id || '',
           // Include any other direct opportunity fields that might be at the root level
@@ -264,11 +341,17 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           ...(opportunity.rfpDetails || {}),
           // Map RFP details from root level if they exist
           rfpTitle: opportunity.rfp_title || opportunity.rfpDetails?.rfpTitle || '',
+          rfpType: opportunity.rfp_type || opportunity.rfpDetails?.rfpType || 'RFP',
           rfpStatus: opportunity.rfp_status || opportunity.rfpDetails?.rfpStatus || 'Draft',
+          rfbDescription: opportunity.rfb_description || opportunity.rfpDetails?.rfbDescription || '',
+          solutionDescription: opportunity.solution_description || opportunity.rfpDetails?.solutionDescription || '',
           submissionDeadline: opportunity.submission_deadline || opportunity.rfpDetails?.submissionDeadline || '',
           bidManager: opportunity.bid_manager || opportunity.rfpDetails?.bidManager || '',
           submissionMode: opportunity.submission_mode || opportunity.rfpDetails?.submissionMode || '',
           portalUrl: opportunity.portal_url || opportunity.rfpDetails?.portalUrl || '',
+          questionSubmissionDate: opportunity.question_submission_date || opportunity.rfpDetails?.questionSubmissionDate || '',
+          responseSubmissionDate: opportunity.response_submission_date || opportunity.rfpDetails?.responseSubmissionDate || '',
+          comments: opportunity.comments || opportunity.rfpDetails?.comments || '',
           qaLogs: Array.isArray(opportunity.qa_logs)
             ? opportunity.qa_logs
             : (Array.isArray(opportunity.rfpDetails?.qaLogs)
@@ -293,20 +376,13 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         sowDocuments: Array.isArray(opportunity.sowDocuments)
           ? opportunity.sowDocuments
           : []
-      });
-
-      console.log('Form data after setting:', {
-        ...formData,
-        opportunity: {
-          ...formData.opportunity,
-          // Don't log the entire nextSteps array to avoid cluttering the console
-          nextSteps: formData.opportunity.nextSteps?.length ? `[${formData.opportunity.nextSteps.length} items]` : '[]'
-        }
-      });
+      };
+      setFormData(newFormData);
     }
   }, [opportunity]);
 
   const updateOpportunityData = (field, value) => {
+    if (opportunity?.isViewMode) return; // Prevent updates in view mode
     setFormData(prev => ({
       ...prev,
       opportunity: {
@@ -317,16 +393,25 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   };
 
   const updateRfpDetails = (field, value) => {
+    if (opportunity?.isViewMode) return; // Prevent updates in view mode
     setFormData(prev => ({
       ...prev,
       rfpDetails: {
         ...prev.rfpDetails,
-        [field]: value
+        [field]: value,
+        // Update related fields if needed
+        ...(field === 'rfpTitle' && !prev.opportunity.opportunity_name && {
+          opportunity: {
+            ...prev.opportunity,
+            opportunity_name: value
+          }
+        })
       }
     }));
   };
 
   const updateSowDetails = (field, value) => {
+    if (opportunity?.isViewMode) return; // Prevent updates in view mode
     setFormData(prev => ({
       ...prev,
       sowDetails: {
@@ -359,8 +444,20 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     return errors;
   };
 
+  const formatNextSteps = (nextSteps) => {
+  if (!Array.isArray(nextSteps)) return [];
+  
+  return nextSteps.map(step => ({
+    step: typeof step === 'string' ? step : step.description || step.step || '',
+    assigned_to: step.assigned_to || step.userName || 'Unassigned',
+    due_date: step.due_date || new Date().toISOString(),
+    status: step.status || 'pending'
+  }));
+};
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('Form submitted with data:', formData);
 
     try {
       // Handle SOW creation if in SOW tab
@@ -373,6 +470,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           // 1. First, get the RFP for this opportunity
           const opportunityId = opportunity?.id || opportunity?.opportunity?.id;
           const rfpResponse = await rfpService.getRFPsByOpportunityId(opportunityId);
+          console.log('RFP response:', rfpResponse);
 
           if (!rfpResponse.data || !rfpResponse.data.id) {
             throw new Error('No RFP found for this opportunity');
@@ -406,7 +504,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
           if (onSuccess) onSuccess(result);
           if (onClose) onClose();
           // Redirect to /sows page after successful creation
-          window.location.href = '/sows';
+            window.location.href = '/sows';
 
         } catch (error) {
           console.error('Error in SOW creation flow:', error);
@@ -417,21 +515,48 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         return;
       }
 
-      // Handle RFP creation if in RFP tab
+      // Handle RFP creation/update if in RFP tab
       if (activeTab === 'rfp') {
+        const opportunityId = opportunity?.id || opportunity?.opportunity?.id;
         const rfpData = {
           opportunityName: formData.opportunity.opportunity_name || 'New RFP',
           title: formData.rfpDetails?.rfpTitle || formData.opportunity.opportunity_name || 'New RFP',
-          rfpStatus: formData.rfpDetails?.rfpStatus || 'Draft',
-          rfpManager: formData.rfpDetails?.bidManager || formData.opportunity.assignedTo || '',
-          submissionDeadline: formData.rfpDetails?.submissionDeadline || formData.opportunity.closeDate || new Date().toISOString().split('T')[0],
-          opportunityId: opportunity?.id || opportunity?.opportunity?.id,
+          rfp_type: formData.rfpDetails?.rfpType || 'RFP',
+          rfp_status: formData.rfpDetails?.rfpStatus || 'Draft',
+          rfp_description: formData.rfpDetails?.rfbDescription || '',
+          solution_description: formData.rfpDetails?.solutionDescription || '',
+          submission_deadline: formData.rfpDetails?.submissionDeadline || formData.opportunity.closeDate || new Date().toISOString().split('T')[0],
+          bid_manager: formData.rfpDetails?.bidManager || formData.opportunity.assignedTo || '',
+          submission_mode: formData.rfpDetails?.submissionMode || 'paid',
+          portal_url: formData.rfpDetails?.portalUrl || '',
+          question_submission_date: formData.rfpDetails?.questionSubmissionDate || '',
+          response_submission_date: formData.rfpDetails?.responseSubmissionDate || '',
+          comments: formData.rfpDetails?.comments || '',
+          opportunity_id: opportunityId,
           rfpDocuments: formData.rfpDocuments || []
         };
 
-        const result = await rfpService.createRFP(rfpData);
-        toast.success('RFP created successfully!');
-        window.location.href = '/rfp-details';
+        let result;
+        try {
+          // First, check if an RFP already exists for this opportunity
+          const existingRfps = await rfpService.getRFPsByOpportunityId(opportunityId);
+          const existingRfp = Array.isArray(existingRfps?.data) ? existingRfps.data[0] : existingRfps?.data;
+          
+          if (existingRfp?.id) {
+            // Update existing RFP
+            result = await rfpService.updateRFP(existingRfp.id, rfpData);
+            toast.success('RFP updated successfully!');
+          } else {
+            // Create new RFP if none exists
+            result = await rfpService.createRFP(rfpData);
+            toast.success('RFP created successfully!');
+          }
+        } catch (error) {
+          console.error('Error checking for existing RFP:', error);
+          // If there's an error checking, try to create a new one as fallback
+          result = await rfpService.createRFP(rfpData);
+          toast.success('RFP created successfully!');
+        }
 
         if (onSuccess && typeof onSuccess === 'function') {
           onSuccess(result);
@@ -499,7 +624,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
 
         // Optional fields with defaults
         lead_source: formData.opportunity.leadSource || null,
-        opportunity_type: formData.opportunity.type || 'New Business',
+        opportunity_type: formData.opportunity.type || '',
         triaged_status: formData.opportunity.triaged === 'Proceed' ? 'Proceed' :
           (formData.opportunity.triaged === 'Drop' ? 'Drop' : 'Hold'),
         pipeline_status: formData.opportunity.pipelineStatus || 'Proposal Work-in-Progress',
@@ -508,15 +633,10 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
         start_date: startDate,
         sales_owner: formData.opportunity.sales_owner || null,
         technical_poc: formData.opportunity.technical_poc || null,
-        presales_poc: formData.opportunity.presales_poc || null
+        presales_poc: formData.opportunity.presales_poc || null,
+        next_steps: formatNextSteps(formData.opportunity.nextSteps || [])
+
       };
-
-      console.log('Submitting opportunity data:', JSON.stringify({
-        isEdit,
-        opportunityId,
-        ...opportunityData
-      }, null, 2));
-
       let result;
       if (isEdit) {
         // For update, make sure we're using the correct ID
@@ -567,6 +687,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   };
 
   const handleClientSelect = (e) => {
+    if (opportunity?.isViewMode) return; // Prevent updates in view mode
     updateOpportunityData('client_name', e.target.value);
   };
 
@@ -589,7 +710,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
   }, []);
 
   const addNextStep = async () => {
-    if (!nextStepInput.trim()) return;
+    if (!nextStepInput.trim() || opportunity?.isViewMode) return;
 
     setIsSubmittingNextStep(true);
     try {
@@ -657,6 +778,24 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
     }
   };
 
+  // Helper function to get user display name
+  const getUserName = (userId) => {
+    if (!userId) return '';
+    
+    // Check if we have the name in form data
+    if (formData.opportunity.sales_owner === userId) {
+      return formData.opportunity.sales_owner_name;
+    }
+    if (formData.opportunity.technical_poc === userId) {
+      return formData.opportunity.technical_poc_name;
+    }
+    if (formData.opportunity.presales_poc === userId) {
+      return formData.opportunity.presales_poc_name;
+    }
+    
+    return `User ${userId}`;
+  };
+
   return (
     <div className="space-y-6">
       {Object.keys(formErrors).length > 0 && (
@@ -718,6 +857,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       onChange={(e) => updateOpportunityData('opportunity_name', e.target.value)}
                       placeholder="Enter Lead name"
                       className={`w-full ${formErrors.opportunity_name ? 'border-red-500' : ''}`}
+                      disabled={opportunity?.isViewMode}
                     />
                     {formErrors.opportunity_name && (
                       <p className="text-red-600 text-sm mt-1">{formErrors.opportunity_name}</p>
@@ -738,7 +878,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                           handleClientSelect({ target: { value: client.client_name } });
                         }
                       }}
-                      disabled={isLoadingClients}
+                      disabled={isLoadingClients || opportunity?.isViewMode}
                       required
                     >
                       <SelectTrigger className="w-full">
@@ -753,6 +893,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                             onClick={(e) => e.stopPropagation()}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             value={searchTerm}
+                            disabled={opportunity?.isViewMode}
                           />
                         </div>
                         <div 
@@ -799,7 +940,8 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                           updateOpportunityData('start_date', selectedDate);
                         }}
                         max={formData.opportunity.closeDate ? formatDateForInput(formData.opportunity.closeDate) : ''}
-                        className="w-full p-2 border rounded border-gray-300"
+                        className={`w-full p-2 border rounded border-gray-300 ${opportunity?.isViewMode ? 'bg-gray-100' : ''}`}
+                        disabled={opportunity?.isViewMode}
                       />
                     </div>
                   </div>
@@ -824,7 +966,8 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                           }
                         }}
                         min={formatDateForInput(new Date())}
-                        className="w-full p-2 border rounded border-gray-300"
+                        className={`w-full p-2 border rounded border-gray-300 ${opportunity?.isViewMode ? 'bg-gray-100' : ''}`}
+                        disabled={opportunity?.isViewMode}
                       />
                     </div>
                   </div>
@@ -836,6 +979,8 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                         <Select
                           value={formData.opportunity.currency}
                           onValueChange={(value) => updateOpportunityData('currency', value)}
+                          disabled={opportunity?.isViewMode}
+
                         >
                           <SelectTrigger className="w-[120px] rounded-r-none border-r-0">
                             <SelectValue placeholder="Currency" />
@@ -856,6 +1001,8 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                           onChange={(e) => updateOpportunityData('amount', e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
                           placeholder="0.00"
                           className="rounded-l-none"
+                          disabled={opportunity?.isViewMode}
+
                           
                         />
                       </div>
@@ -866,16 +1013,26 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   <div>
                     <Label htmlFor="type">Type <span className="text-red-600">*</span></Label>
                     <Select
-                      value={formData.opportunity.type}
-                      onValueChange={(value) => updateOpportunityData('type', value)}
+                      value={formData.opportunity.type || opportunity?.opportunity_type || ''}
+                      onValueChange={(value) => {
+                        updateOpportunityData('type', value);
+                      }}
                       required
+                      disabled={opportunity?.isViewMode}
+
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select type">
+                          {formData.opportunity.type || opportunity?.opportunity_type || 'Select type'}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="New Business">New Business</SelectItem>
                         <SelectItem value="Existing Business">Existing Business</SelectItem>
+                        <SelectItem value="Upsell">Upsell</SelectItem>
+                        <SelectItem value="Renewal">Renewal</SelectItem>
+                        <SelectItem value="Cross-sell">Cross-sell</SelectItem>
+                        <SelectItem value="Referral">Referral</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -884,12 +1041,16 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   <div>
                     <Label htmlFor="leadSource">Lead Source <span className="text-red-600">*</span></Label>
                     <Select
-                      value={formData.opportunity.leadSource}
+                      value={formData.opportunity.leadSource || opportunity?.lead_source || ''}
                       onValueChange={(value) => updateOpportunityData('leadSource', value)}
                       required
+                      disabled={opportunity?.isViewMode}
+
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select lead source" />
+                      <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
+                        <SelectValue placeholder="Select lead source">
+                          {formData.opportunity.leadSource || opportunity?.lead_source || 'Select lead source'}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {LEAD_SOURCES.map((source) => (
@@ -911,6 +1072,8 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                         onChange={(e) => updateOpportunityData('partnerOrganization', e.target.value)}
                         placeholder="Enter partner organization name"
                         required
+                        disabled={opportunity?.isViewMode}
+
                       />
                     </div>
                   )}
@@ -925,22 +1088,50 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                         onChange={(e) => updateOpportunityData('partnerIndividual', e.target.value)}
                         placeholder="Enter partner name"
                         required
+                        disabled={opportunity?.isViewMode}
+
                       />
                     </div>
                   )}
+
+                  {/* Sales Owner */}
                   <div>
                     <Label htmlFor="sales_owner">Sales Owner</Label>
                     <Select
-                      value={formData.opportunity.sales_owner}
-                      onValueChange={(value) => updateOpportunityData('sales_owner', value)}
+                      value={formData.opportunity.sales_owner || ''}
+                      onValueChange={(value) => {
+                        if (opportunity?.isViewMode) return;
+                        const selectedOwner = users.find(user => 
+                          String(user.id) === String(value) || 
+                          String(user._id) === String(value)
+                        );
+
+                        if (selectedOwner) {
+                          setFormData(prev => ({
+                            ...prev,
+                            opportunity: {
+                              ...prev.opportunity,
+                              sales_owner: String(selectedOwner.id || selectedOwner._id),
+                              sales_owner_name: selectedOwner.full_name || 
+                                              selectedOwner.name || 
+                                              selectedOwner.email || 
+                                              `User ${selectedOwner.id || selectedOwner._id}`
+                            }
+                          }));
+                        }
+                      }}
+                      disabled={opportunity?.isViewMode}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
                         <SelectValue placeholder="Select sales owner">
-                          {(() => {
-                            if (!formData.opportunity.sales_owner) return 'Select a user';
-                            const user = users.find(u => String(u.id) === String(formData.opportunity.sales_owner) || String(u._id) === String(formData.opportunity.sales_owner));
-                            return user ? (user.full_name || user.name || user.email || `User ${user.id || user._id}`) : 'Select a user';
-                          })()}
+                          {formData.opportunity.sales_owner_name || 
+                           (users.length > 0 && formData.opportunity.sales_owner
+                             ? (users.find(user => 
+                                  String(user.id) === String(formData.opportunity.sales_owner) || 
+                                  String(user._id) === String(formData.opportunity.sales_owner)
+                                )?.full_name || `User ${formData.opportunity.sales_owner}`)
+                             : 'Select sales owner'
+                          )}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -952,8 +1143,10 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                         ) : users.length > 0 ? (
                           users.map((user) => {
                             const userId = user.id || user._id;
+                            if (!userId) return null;
+                            
                             return (
-                              <SelectItem key={userId} value={userId}>
+                              <SelectItem key={userId} value={String(userId)}>
                                 {user.full_name || user.name || user.email || `User ${userId}`}
                               </SelectItem>
                             );
@@ -967,19 +1160,44 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                     </Select>
                   </div>
 
+                  {/* Technical POC */}
                   <div>
                     <Label htmlFor="technical_poc">Technical POC</Label>
                     <Select
-                      value={formData.opportunity.technical_poc}
-                      onValueChange={(value) => updateOpportunityData('technical_poc', value)}
+                      value={formData.opportunity.technical_poc || ''}
+                      onValueChange={(value) => {
+                        if (opportunity?.isViewMode) return;
+                        const selectedUser = users.find(user => 
+                          String(user.id) === String(value) || 
+                          String(user._id) === String(value)
+                        );
+                        
+                        if (selectedUser) {
+                          setFormData(prev => ({
+                            ...prev,
+                            opportunity: {
+                              ...prev.opportunity,
+                              technical_poc: String(selectedUser.id || selectedUser._id),
+                              technical_poc_name: selectedUser.full_name || 
+                                              selectedUser.name || 
+                                              selectedUser.email || 
+                                              `User ${selectedUser.id || selectedUser._id}`
+                            }
+                          }));
+                        }
+                      }}
+                      disabled={opportunity?.isViewMode}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
                         <SelectValue placeholder="Select technical POC">
-                          {(() => {
-                            if (!formData.opportunity.technical_poc) return 'Select a user';
-                            const user = users.find(u => String(u.id) === String(formData.opportunity.technical_poc) || String(u._id) === String(formData.opportunity.technical_poc));
-                            return user ? (user.full_name || user.name || user.email || `User ${user.id || user._id}`) : 'Select a user';
-                          })()}
+                          {formData.opportunity.technical_poc_name || 
+                           (users.length > 0 && formData.opportunity.technical_poc
+                             ? (users.find(user => 
+                                  String(user.id) === String(formData.opportunity.technical_poc) || 
+                                  String(user._id) === String(formData.opportunity.technical_poc)
+                                )?.full_name || `User ${formData.opportunity.technical_poc}`)
+                             : 'Select technical POC'
+                          )}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -991,8 +1209,10 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                         ) : users.length > 0 ? (
                           users.map((user) => {
                             const userId = user.id || user._id;
+                            if (!userId) return null;
+                            
                             return (
-                              <SelectItem key={userId} value={userId}>
+                              <SelectItem key={userId} value={String(userId)}>
                                 {user.full_name || user.name || user.email || `User ${userId}`}
                               </SelectItem>
                             );
@@ -1006,19 +1226,44 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                     </Select>
                   </div>
 
+                  {/* Presales POC */}
                   <div>
                     <Label htmlFor="presales_poc">Presales POC</Label>
                     <Select
-                      value={formData.opportunity.presales_poc}
-                      onValueChange={(value) => updateOpportunityData('presales_poc', value)}
+                      value={formData.opportunity.presales_poc || ''}
+                      onValueChange={(value) => {
+                        if (opportunity?.isViewMode) return;
+                        const selectedUser = users.find(user => 
+                          String(user.id) === String(value) || 
+                          String(user._id) === String(value)
+                        );
+                        
+                        if (selectedUser) {
+                          setFormData(prev => ({
+                            ...prev,
+                            opportunity: {
+                              ...prev.opportunity,
+                              presales_poc: String(selectedUser.id || selectedUser._id),
+                              presales_poc_name: selectedUser.full_name || 
+                                              selectedUser.name || 
+                                              selectedUser.email || 
+                                              `User ${selectedUser.id || selectedUser._id}`
+                            }
+                          }));
+                        }
+                      }}
+                      disabled={opportunity?.isViewMode}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
                         <SelectValue placeholder="Select presales POC">
-                          {(() => {
-                            if (!formData.opportunity.presales_poc) return 'Select a user';
-                            const user = users.find(u => String(u.id) === String(formData.opportunity.presales_poc) || String(u._id) === String(formData.opportunity.presales_poc));
-                            return user ? (user.full_name || user.name || user.email || `User ${user.id || user._id}`) : 'Select a user';
-                          })()}
+                          {formData.opportunity.presales_poc_name || 
+                           (users.length > 0 && formData.opportunity.presales_poc
+                             ? (users.find(user => 
+                                  String(user.id) === String(formData.opportunity.presales_poc) || 
+                                  String(user._id) === String(formData.opportunity.presales_poc)
+                                )?.full_name || `User ${formData.opportunity.presales_poc}`)
+                             : 'Select presales POC'
+                          )}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -1030,8 +1275,10 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                         ) : users.length > 0 ? (
                           users.map((user) => {
                             const userId = user.id || user._id;
+                            if (!userId) return null;
+                            
                             return (
-                              <SelectItem key={userId} value={userId}>
+                              <SelectItem key={userId} value={String(userId)}>
                                 {user.full_name || user.name || user.email || `User ${userId}`}
                               </SelectItem>
                             );
@@ -1044,14 +1291,17 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       </SelectContent>
                     </Select>
                   </div>
+
                   {/* Triaged */}
                   <div>
                     <Label htmlFor="triaged">Triaged <span className="text-red-600">*</span></Label>
                     <Select
-                      value={formData.opportunity.triaged}
+                      value={formData.opportunity.triaged || 'Hold'}
                       onValueChange={(value) => {
-                        updateOpportunityData('triaged', value);
-                        if (value === 'Drop') {
+                        if (opportunity?.isViewMode) return;
+                        const normalizedValue = normalizeTriageStatus(value);
+                        updateOpportunityData('triaged', normalizedValue);
+                        if (normalizedValue === 'Drop') {
                           updateOpportunityData('pipelineStatus', '');
                         } else if (!formData.opportunity.pipelineStatus) {
                           const defaultStatus = 'Proposal Work-in-Progress';
@@ -1059,9 +1309,10 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                           updateOpportunityData('winProbability', getWinProbability(defaultStatus));
                         }
                       }}
+                      disabled={opportunity?.isViewMode}
                       required
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
                         <SelectValue placeholder="Select triage status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1084,13 +1335,15 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       <Select
                         value={formData.opportunity.pipelineStatus}
                         onValueChange={(status) => {
+                          if (opportunity?.isViewMode) return;
                           updateOpportunityData('pipelineStatus', status);
                           const newWinProbability = getWinProbability(status);
                           updateOpportunityData('winProbability', newWinProbability);
                         }}
+                        disabled={opportunity?.isViewMode}
                         required
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1100,7 +1353,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                             </SelectItem>
                           ))}
                         </SelectContent>
-                      </Select>
+                    </Select>
                     </div>
                   )}
 
@@ -1125,9 +1378,12 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                         max={100}
                         step={10}
                         value={[formData.opportunity.winProbability || 0]}
-                        onValueChange={([value]) => updateOpportunityData('winProbability', value)}
+                        onChange={(e) => {
+                          if (opportunity?.isViewMode) return;
+                          updateOpportunityData('winProbability', parseInt(e.target.value, 10));
+                        }}
+                        disabled={opportunity?.isViewMode || ['Won', 'Lost'].includes(formData.opportunity.pipelineStatus)}
                         className="w-full"
-                        disabled={['Won', 'Lost'].includes(formData.opportunity.pipelineStatus)}
                       />
                       <div className="flex justify-between text-xs text-muted-foreground mt-1">
                         <span>0%</span>
@@ -1144,20 +1400,21 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                         <Input
                           value={nextStepInput}
                           onChange={(e) => setNextStepInput(e.target.value)}
-                          placeholder="Add a next step..."
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              addNextStep();
-                            }
-                          }}
+                          placeholder="Enter next step"
+                          onKeyDown={(e) => e.key === 'Enter' && addNextStep()}
+                          disabled={opportunity?.isViewMode}
+                          className={opportunity?.isViewMode ? 'bg-gray-100' : ''}
                         />
                         <Button
                           type="button"
                           onClick={addNextStep}
-                          disabled={!nextStepInput.trim() || isSubmittingNextStep}
+                          disabled={!nextStepInput.trim() || isSubmittingNextStep || opportunity?.isViewMode}
                         >
-                          {isSubmittingNextStep ? 'Adding...' : 'Add'}
+                          {isSubmittingNextStep ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            'Add'
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -1175,13 +1432,13 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                             <div className="flex justify-between items-start">
                               <div className="space-y-1">
                                 <div className="font-semibold text-sm">
-                                  {step.userName || 'User'}
+                                  {step.assigned_to || 'Unassigned'}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  {formatDate(step.createdAt)}
+                                  {formatDate(step.due_date || step.createdAt)}
                                 </div>
                                 <p className="text-sm mt-1">
-                                  {step.description}
+                                  {step.step || step.description || 'No description'}
                                 </p>
                               </div>
                             </div>
@@ -1212,14 +1469,16 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                   <div>
                     <Label htmlFor="rfpType">Type</Label>
                     <Select
-                      value={formData.rfpDetails.rfpType || ''}
+                      value={formData.rfpDetails.rfpType || 'RFP'}
                       onValueChange={(value) => updateRfpDetails('rfpType', value)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="RFP">RFP</SelectItem>
+                        {RFP_TYPES.map(type => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1231,7 +1490,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       value={formData.rfpDetails.rfpStatus}
                       onValueChange={(value) => updateRfpDetails('rfpStatus', value)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1283,53 +1542,23 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
 
                   <div>
                     <Label htmlFor="bidManager">Response Owner</Label>
-                    <Select
-                      value={formData.rfpDetails.bidManager}
-                      onValueChange={(value) => {
-                        console.log('New value selected:', value);
-                        updateRfpDetails('bidManager', value);
+                    <Input
+                      type="text"
+                      value={formData.rfpDetails.bidManager || ''}
+                      onChange={(e) => {
+                        updateRfpDetails('bidManager', e.target.value);
                       }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select response owner">
-                          {formData.rfpDetails.bidManager ?
-                            users.find(u => String(u.id || u._id) === String(formData.rfpDetails.bidManager))?.full_name ||
-                            'Unknown User'
-                            : null
-                          }
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {isLoadingUsers ? (
-                          <div className="p-2 text-center">
-                            <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                            <p className="text-sm text-muted-foreground mt-1">
-                              Loading users...
-                            </p>
-                          </div>
-                        ) : users.length > 0 ? (
-                          users.map((user) => {
-                            const userId = user.id || user._id;
-                            return (
-                              <SelectItem key={userId} value={String(userId)}>
-                                {user.full_name || user.name || user.email || `User ${userId}`}
-                              </SelectItem>
-                            );
-                          })
-                        ) : (
-                          <div className="p-2 text-center text-sm text-muted-foreground">
-                            No users found
-                          </div>
-                        )}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Enter bid manager name"
+                    />
                   </div>
+
                   {/* Submission Mode */}
                   <div>
                     <Label htmlFor="submissionMode">Submission Mode</Label>
                     <Input
                       id="submissionMode"
-                      value={formData.rfpDetails.submissionMode}
+                      type="text"
+                      value={formData.rfpDetails.submissionMode || ''}
                       onChange={(e) => updateRfpDetails('submissionMode', e.target.value)}
                       placeholder="e.g., Email, Portal, etc."
                     />
@@ -1360,134 +1589,148 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                     {isQaExpanded && (
                       <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div>
+  <Label htmlFor="question-submission-date">Question Submission Date</Label>
+  <Input
+    id="question-submission-date"
+    type="date"
+    className="mt-1 w-full"
+    value={formData.rfpDetails.questionSubmissionDate ? 
+      formatDateForInput(formData.rfpDetails.questionSubmissionDate) : ''}
+    onChange={(e) => {
+      // Update root level date
+      updateRfpDetails('questionSubmissionDate', e.target.value);
+      
+      // Also update qaLogs if it exists
+      if (formData.rfpDetails.qaLogs?.length > 0) {
+        const updatedQaLogs = [...formData.rfpDetails.qaLogs];
+        updatedQaLogs[0] = {
+          ...updatedQaLogs[0],
+          questionSubmissionDate: e.target.value,
+          askedAt: e.target.value || new Date().toISOString()
+        };
+        updateRfpDetails('qaLogs', updatedQaLogs);
+      }
+    }}
+  />
+</div>
                           <div>
-                            <Label htmlFor="question-submission-date">Question Submission Date</Label>
-                            <Input
-                              id="question-submission-date"
-                              type="date"
-                              className="mt-1 w-full"
-                              value={formData.rfpDetails.qaLogs?.[0]?.questionSubmissionDate ? 
-                                formatDateForInput(formData.rfpDetails.qaLogs[0].questionSubmissionDate) : 
-                                formatDateForInput(new Date().toISOString())}
-                              onChange={(e) => {
-                                if (formData.rfpDetails.qaLogs?.length > 0) {
-                                  const updatedQaLogs = [...formData.rfpDetails.qaLogs];
-                                  updatedQaLogs[0] = {
-                                    ...updatedQaLogs[0],
-                                    questionSubmissionDate: e.target.value,
-                                    askedAt: e.target.value || new Date().toISOString()
-                                  };
-                                  updateRfpDetails('qaLogs', updatedQaLogs);
-                                } else {
-                                  const newQa = {
-                                    id: Date.now().toString(),
-                                    question: '',
-                                    askedBy: 'current_user',
-                                    askedAt: new Date().toISOString(),
-                                    questionSubmissionDate: e.target.value,
-                                    responseSubmissionDate: '',
-                                    answer: ''
-                                  };
-                                  updateRfpDetails('qaLogs', [newQa]);
-                                }
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="response-submission-date">Response Submission Date</Label>
-                            <Input
-                              id="response-submission-date"
-                              type="date"
-                              className="mt-1 w-full"
-                              value={formData.rfpDetails.qaLogs?.[0]?.responseSubmissionDate ? 
-                                formatDateForInput(formData.rfpDetails.qaLogs[0].responseSubmissionDate) : ''}
-                              onChange={(e) => {
-                                if (formData.rfpDetails.qaLogs?.length > 0) {
-                                  const updatedQaLogs = [...formData.rfpDetails.qaLogs];
-                                  updatedQaLogs[0] = {
-                                    ...updatedQaLogs[0],
-                                    responseSubmissionDate: e.target.value,
-                                    answeredBy: 'current_user',
-                                    answeredAt: new Date().toISOString()
-                                  };
-                                  updateRfpDetails('qaLogs', updatedQaLogs);
-                                } else {
-                                  const newQa = {
-                                    id: Date.now().toString(),
-                                    question: '',
-                                    askedBy: 'current_user',
-                                    askedAt: new Date().toISOString(),
-                                    questionSubmissionDate: new Date().toISOString(),
-                                    responseSubmissionDate: e.target.value,
-                                    answer: ''
-                                  };
-                                  updateRfpDetails('qaLogs', [newQa]);
-                                }
-                              }}
-                            />
-                          </div>
+  <Label htmlFor="response-submission-date">Response Submission Date</Label>
+  <Input
+    id="response-submission-date"
+    type="date"
+    className="mt-1 w-full"
+    value={formData.rfpDetails.responseSubmissionDate ? 
+      formatDateForInput(formData.rfpDetails.responseSubmissionDate) : ''}
+    onChange={(e) => {
+      // Update root level date
+      updateRfpDetails('responseSubmissionDate', e.target.value);
+      
+      // Also update qaLogs if it exists
+      if (formData.rfpDetails.qaLogs?.length > 0) {
+        const updatedQaLogs = [...formData.rfpDetails.qaLogs];
+        updatedQaLogs[0] = {
+          ...updatedQaLogs[0],
+          responseSubmissionDate: e.target.value
+        };
+        updateRfpDetails('qaLogs', updatedQaLogs);
+      }
+    }}
+  />
+</div>
                         </div>
                         
                         <div>
-                          <Label htmlFor="qa-comment">Comment Box</Label>
-                          <Textarea
-                            id="qa-comment"
-                            className="mt-1 w-full min-h-[100px]"
-                            placeholder="Add your comments here..."
-                            value={formData.rfpDetails.qaLogs?.[0]?.question || ''}
-                            onChange={(e) => {
-                              if (formData.rfpDetails.qaLogs?.length > 0) {
-                                const updatedQaLogs = [...formData.rfpDetails.qaLogs];
-                                updatedQaLogs[0] = {
-                                  ...updatedQaLogs[0],
-                                  question: e.target.value
-                                };
-                                updateRfpDetails('qaLogs', updatedQaLogs);
-                              } else {
-                                const newQa = {
-                                  id: Date.now().toString(),
-                                  question: e.target.value,
-                                  askedBy: 'current_user',
-                                  askedAt: new Date().toISOString(),
-                                  questionSubmissionDate: new Date().toISOString(),
-                                  responseSubmissionDate: '',
-                                  answer: ''
-                                };
-                                updateRfpDetails('qaLogs', [newQa]);
-                              }
-                            }}
-                          />
-                        </div>
+  <Label htmlFor="qa-comment">Comment Box</Label>
+  <Textarea
+    id="qa-comment"
+    className="mt-1 w-full min-h-[100px]"
+    placeholder="Add your comments here..."
+    value={formData.rfpDetails.comments || ''}
+    onChange={(e) => {
+      // Update root level comments
+      updateRfpDetails('comments', e.target.value);
+      
+      // Also update qaLogs if it exists
+      if (formData.rfpDetails.qaLogs?.length > 0) {
+        const updatedQaLogs = [...formData.rfpDetails.qaLogs];
+        updatedQaLogs[0] = {
+          ...updatedQaLogs[0],
+          question: e.target.value
+        };
+        updateRfpDetails('qaLogs', updatedQaLogs);
+      }
+    }}
+  />
+</div>
                         
-                        <div>
-                          <Label>QA Document Upload</Label>
-                          <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md">
-                            <div className="space-y-1 text-center">
-                              <div className="flex text-sm text-muted-foreground">
-                                <label
-                                  htmlFor="file-upload"
-                                  className="relative cursor-pointer bg-transparent rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none"
-                                >
-                                  <span>Upload a file</span>
-                                  <input
-                                    id="file-upload"
-                                    name="file-upload"
-                                    type="file"
-                                    className="sr-only"
-                                    onChange={(e) => {
-                                      // Handle file upload logic here
-                                      console.log('File selected:', e.target.files[0]);
-                                    }}
-                                  />
-                                </label>
-                                <p className="pl-1">or drag and drop</p>
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                PDF, DOC, DOCX up to 10MB
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                       <div>
+  <Label>QA Document Upload</Label>
+  <div className="mt-1 flex flex-col items-center px-6 pt-5 pb-6 border-2 border-dashed border-gray-300 rounded-md">
+    <div className="space-y-1 text-center">
+      <div className="flex text-sm text-muted-foreground">
+        <label
+          htmlFor="file-upload"
+          className="relative cursor-pointer bg-transparent rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none"
+        >
+          <span>Upload a file</span>
+          <input
+            id="file-upload"
+            name="file-upload"
+            type="file"
+            className="sr-only"
+            accept=".pdf,.doc,.docx"
+            onChange={(e) => {
+              const files = Array.from(e.target.files);
+              setSelectedFiles(files);
+              
+              // Also update the form data if needed
+              updateRfpDetails('qaDocuments', files);
+            }}
+          />
+        </label>
+        <p className="pl-1">or drag and drop</p>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        PDF, DOC, DOCX up to 10MB
+      </p>
+    </div>
+    
+    {/* Display selected files */}
+    {selectedFiles.length > 0 && (
+      <div className="mt-4 w-full">
+        <p className="text-sm font-medium mb-2">Selected Files:</p>
+        <ul className="space-y-2">
+          {selectedFiles.map((file, index) => (
+            <li key={index} className="flex items-center justify-between p-2 border rounded">
+              <div className="flex items-center space-x-2">
+                <FileText className="h-4 w-4 text-blue-500" />
+                <span className="text-sm truncate max-w-xs">{file.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => {
+                  const newFiles = [...selectedFiles];
+                  newFiles.splice(index, 1);
+                  setSelectedFiles(newFiles);
+                  updateRfpDetails('qaDocuments', newFiles);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+  </div>
+</div>
                       </div>
                     )}
                   </div>
@@ -1599,7 +1842,7 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
                       value={formData.sowDetails.sowStatus}
                       onValueChange={(value) => updateSowDetails('sowStatus', value)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1702,23 +1945,34 @@ const OpportunityFormTabbed = ({ opportunity, onClose, onSuccess, showOnlyRFP = 
 
           {/* Form Actions */}
           <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-              Cancel
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose} 
+              disabled={loading}
+            >
+              {opportunity?.isViewMode && activeTab !== 'sow' ? 'Close' : 'Cancel'}
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {opportunity ? 'Updating...' : 'Creating...'}
-                </>
-              ) : (
-                <>
-                  {activeTab === 'sow' ? 'Add SOW' :
-                    activeTab === 'rfp' ? 'Add' :
-                      (opportunity ? 'Update' : 'Create')}
-                </>
-              )}
-            </Button>
+            
+            {/* Always show Add SOW button when in SOW tab, regardless of view mode */}
+            {(activeTab === 'sow' || !opportunity?.isViewMode) && (
+              <Button 
+                type="submit" 
+                disabled={loading || (activeTab === 'sow' && !formData.sowDetails?.sowTitle)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {activeTab === 'sow' ? 'Adding...' : (opportunity ? 'Updating...' : 'Creating...')}
+                  </>
+                ) : (
+                  activeTab === 'sow' ? 'Add SOW' :
+                  activeTab === 'rfp' ? 'Add' :
+                  (opportunity ? 'Update' : 'Create')
+                )}
+              </Button>
+            )}
           </div>
         </form>
       </Tabs>

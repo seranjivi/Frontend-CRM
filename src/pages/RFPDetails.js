@@ -21,7 +21,7 @@ import {
 import { saveAs } from 'file-saver';
 import DataTable from '../components/DataTable';
 import rfpService from '../services/rfpService';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 const RFPDetails = () => {
   const [data, setData] = useState([]);
@@ -41,9 +41,7 @@ const RFPDetails = () => {
     const fetchRFPs = async () => {
       try {
         setLoading(true);
-        const response = await rfpService.getRFPs();
-        console.log('API Response:', response); // Log the response for debugging
-        
+        const response = await rfpService.getRFPs();        
         // Check if the response is an array, if not, use response.data or fallback to empty array
         const responseData = Array.isArray(response) ? response : 
                           (response?.data && Array.isArray(response.data) ? response.data : []);
@@ -206,24 +204,26 @@ const RFPDetails = () => {
   };
   // Handlers for table actions
   const handleView = (item) => {
-    console.log('View item:', item);
     // Add your view logic here
   };
 
   const handleEdit = (item) => {
-    console.log('Edit item:', item);
     // Add your edit logic here
   };
 
   const handleDelete = async (item) => {
-    if (window.confirm(`Are you sure you want to delete ${item.opportunityName}?`)) {
+    if (window.confirm(`Are you sure you want to delete ${item.opportunityName || 'this RFP'}?`)) {
       try {
+        setLoading(true);
         await rfpService.deleteRFP(item.id);
-        setData(data.filter(d => d.id !== item.id));
+        // Remove the deleted RFP from the list
+        setData(prevData => prevData.filter(d => d.id !== item.id));
         toast.success('RFP deleted successfully');
       } catch (error) {
         console.error('Error deleting RFP:', error);
-        toast.error('Failed to delete RFP');
+        toast.error(error.response?.data?.message || 'Failed to delete RFP');
+      } finally {
+        setLoading(false);
       }
     }
   };

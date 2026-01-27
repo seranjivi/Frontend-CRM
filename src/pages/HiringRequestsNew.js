@@ -106,7 +106,6 @@ const HiringRequests = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('Form submitted:', { hireSource, ...formData });
     setShowCreateForm(false);
   };
 
