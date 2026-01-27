@@ -21,7 +21,7 @@ import {
 import { saveAs } from 'file-saver';
 import DataTable from '../components/DataTable';
 import rfpService from '../services/rfpService';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 const RFPDetails = () => {
   const [data, setData] = useState([]);
@@ -212,14 +212,18 @@ const RFPDetails = () => {
   };
 
   const handleDelete = async (item) => {
-    if (window.confirm(`Are you sure you want to delete ${item.opportunityName}?`)) {
+    if (window.confirm(`Are you sure you want to delete ${item.opportunityName || 'this RFP'}?`)) {
       try {
+        setLoading(true);
         await rfpService.deleteRFP(item.id);
-        setData(data.filter(d => d.id !== item.id));
+        // Remove the deleted RFP from the list
+        setData(prevData => prevData.filter(d => d.id !== item.id));
         toast.success('RFP deleted successfully');
       } catch (error) {
         console.error('Error deleting RFP:', error);
-        toast.error('Failed to delete RFP');
+        toast.error(error.response?.data?.message || 'Failed to delete RFP');
+      } finally {
+        setLoading(false);
       }
     }
   };

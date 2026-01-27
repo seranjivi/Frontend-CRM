@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import opportunityService from '../services/opportunityService';
 import { Button } from '../components/ui/button';
-import { Plus, ArrowRight, Filter, Upload, Download, Search, CheckCircle, Edit } from 'lucide-react';
+import { Plus, ArrowRight, Filter, Upload, Download, Search, CheckCircle, Edit, Eye } from 'lucide-react';
 import ImportCSVModal from '../components/ImportCSVModal';
 import DataTable from '../components/DataTable';
 import OpportunityFormTabbed from '../components/OpportunityFormTabbed';
@@ -266,21 +266,46 @@ const Opportunities = () => {
 
   const navigate = useNavigate();
 
-  const handleView = (opportunity, currentStage = APPROVAL_STAGES.LEVEL_1_RFB) => {
-    // Reset all view states first
-    setIsRFPView(false);
-    setShowOnlyDetails(false);
-    setShowOnlySOW(false);
-    
-    // Set the appropriate view based on the current stage
-    if (currentStage === APPROVAL_STAGES.LEVEL_2_SOW) {
-      setShowOnlySOW(true);
-    } else {
-      setIsRFPView(true);
+  const handleView = async (opportunity, currentStage) => {
+    try {
+      // Set view states based on the currentStage
+      const isRFPStage = currentStage === APPROVAL_STAGES.LEVEL_1_RFB;
+      const isSOWStage = currentStage === APPROVAL_STAGES.LEVEL_2_SOW;
+      
+      // Set the appropriate view states
+      setIsRFPView(isRFPStage);
+      setShowOnlyDetails(!isRFPStage && !isSOWStage); // Show only Details tab if not RFP or SOW stage
+      setShowOnlySOW(isSOWStage);
+      
+      // Fetch the latest opportunity data from the API
+      const response = await opportunityService.getOpportunityById(opportunity.id);
+      
+      // Set the opportunity data for viewing with view mode flag
+      // For RFP stage, set isViewMode to false to show the Add button
+      setEditingOpportunity({
+        ...response.data,
+        isViewMode: isRFPStage ? false : true // Allow editing in RFP view
+      });
+      
+      setShowForm(true);
+    } catch (error) {
+      console.error('Error fetching opportunity details:', error);
+      toast.error('Failed to load opportunity details');
+      
+      // Fallback to using the existing data if API call fails
+      const isRFPStage = currentStage === APPROVAL_STAGES.LEVEL_1_RFB;
+      const isSOWStage = currentStage === APPROVAL_STAGES.LEVEL_2_SOW;
+      
+      setIsRFPView(isRFPStage);
+      setShowOnlyDetails(!isRFPStage && !isSOWStage);
+      setShowOnlySOW(isSOWStage);
+      
+      setEditingOpportunity({
+        ...opportunity,
+        isViewMode: isRFPStage ? false : true // Allow editing in RFP view
+      });
+      setShowForm(true);
     }
-    
-    setEditingOpportunity(opportunity);
-    setShowForm(true);
   };
 
   const handleViewAttachments = (opportunity) => {
@@ -393,7 +418,22 @@ const Opportunities = () => {
       header: 'Actions',
       headerClassName: 'text-[18px] font-medium',
       render: (_, row) => (
-        <div className="flex space-x-2">
+        <div className="flex space-x-1">
+          {/* View Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleView(row);
+            }}
+            className="h-8 w-8 p-0 text-gray-500 hover:text-gray-600"
+            title="View"
+          >
+            <Eye className="h-4 w-4 text-current" />
+          </Button>
+          
+          {/* Edit Button */}
           <Button
             variant="ghost"
             size="sm"
@@ -406,6 +446,8 @@ const Opportunities = () => {
           >
             <Edit className="h-4 w-4" />
           </Button>
+          
+          {/* Delete Button */}
           <Button
             variant="ghost"
             size="sm"
@@ -571,7 +613,14 @@ const Opportunities = () => {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {showOnlySOW ? 'SOW Details' : isRFPView ? 'Opportunity-RFP' : editingOpportunity ? 'Edit Lead' : 'Add New Lead'}
+              {editingOpportunity?.isViewMode 
+                ? (isRFPView ? 'Opportunity - RFP Details' 
+                   : showOnlySOW ? 'SOW Details' 
+                   : 'View Lead')
+                : showOnlySOW ? 'SOW Details' 
+                : isRFPView ? 'Opportunity-RFP' 
+                : editingOpportunity ? 'Edit Lead' 
+                : 'Add New Lead'}
             </DialogTitle>
           </DialogHeader>
           <OpportunityFormTabbed 
