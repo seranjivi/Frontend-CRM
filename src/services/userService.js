@@ -24,7 +24,6 @@ export const getUserById = async (userId) => {
     }
 
     // Log the raw response for debugging
-    console.log('Raw user data from API:', userData);
 
     // Return the user data in a consistent format
     return {

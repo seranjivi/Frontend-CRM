@@ -64,7 +64,6 @@ const handleEdit = async (user) => {
   try {
     const response = await userService.getUserById(user.id);
     const userData = response.data;
-    console.log('User data from API:', userData);
 
     // Get role names from the API response
     const roleNames = userData.roles || [];
@@ -87,7 +86,6 @@ const handleEdit = async (user) => {
       id: userData.id || user.id
     };
     
-    console.log('Formatted user data:', formattedUser);
     setEditingUser(formattedUser);
     setShowForm(true);
   } catch (error) {

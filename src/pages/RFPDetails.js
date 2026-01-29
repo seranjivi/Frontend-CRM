@@ -211,8 +211,69 @@ const RFPDetails = () => {
     try {
       setLoading(true);
       setIsEditMode(false);
-      const rfpDetails = await rfpService.getRFPById(item.id);
-      setSelectedRFP(rfpDetails);
+      console.log('Fetching RFP with ID:', item.id);
+      const response = await rfpService.getRFPById(item.id);
+      console.log('Raw API Response:', response);
+      
+      // Extract the data from the response
+      const rfpData = response.data?.data || response.data || response;
+      console.log('Extracted RFP Data:', rfpData);
+      
+      if (!rfpData) {
+        console.error('No data received from API');
+        throw new Error('No data received from API');
+      }
+      // Map the RFP data to match the OpportunityFormTabbed component's structure
+      const mappedRFP = {
+        // Opportunity fields
+        opportunity: {
+          id: rfpData.opportunityId || rfpData.opportunity?.id || '',
+          opportunity_name: rfpData.opportunityName || rfpData.opportunity?.name || '',
+          client_name: rfpData.clientName || rfpData.opportunity?.client_name || '',
+          // Add other opportunity fields as needed
+          ...(rfpData.opportunity || {})
+        },
+        
+        // RFP Details
+        rfpDetails: {
+          rfpTitle: rfpData.rfpTitle || '',
+          rfpType: rfpData.rfpType || 'RFP',
+          rfpStatus: rfpData.rfpStatus || 'Draft',
+          rfbDescription: rfpData.rfpDescription || rfpData.description || '',
+          solutionDescription: rfpData.solutionDescription || '',
+          submissionDeadline: rfpData.submissionDeadline || '',
+          bidManager: rfpData.bidManager || '',
+          submissionMode: rfpData.submissionMode || 'Email',
+          portalUrl: rfpData.portalUrl || '',
+          questionSubmissionDate: rfpData.questionSubmissionDate || '',
+          responseSubmissionDate: rfpData.responseSubmissionDate || '',
+          comments: rfpData.comments || '',
+          qaLogs: rfpData.qaLogs || []
+        },
+        
+        // Documents
+        rfpDocuments: Array.isArray(rfpData.documents) ? rfpData.documents : [],
+        
+        // View mode flag
+        isViewMode: true,
+        
+        // Map direct fields for backward compatibility
+        id: rfpData.id,
+        rfpTitle: rfpData.rfpTitle || '',
+        rfpDescription: rfpData.rfpDescription || '',
+        solutionDescription: rfpData.solutionDescription || '',
+        submissionDeadline: rfpData.submissionDeadline || '',
+        bidManager: rfpData.bidManager || '',
+        submissionMode: rfpData.submissionMode || 'Email',
+        portalUrl: rfpData.portalUrl || '',
+        questionSubmissionDate: rfpData.questionSubmissionDate || '',
+        responseSubmissionDate: rfpData.responseSubmissionDate || '',
+        comments: rfpData.comments || '',
+        documents: Array.isArray(rfpData.documents) ? rfpData.documents : []
+      };
+      
+      console.log('Mapped RFP Data:', mappedRFP); // For debugging
+      setSelectedRFP(mappedRFP);
       setViewRFPDialogOpen(true);
     } catch (error) {
       console.error('Error fetching RFP details:', error);
@@ -226,8 +287,69 @@ const RFPDetails = () => {
     try {
       setLoading(true);
       setIsEditMode(true);
-      const rfpDetails = await rfpService.getRFPById(item.id);
-      setSelectedRFP(rfpDetails);
+      console.log('Fetching RFP for edit with ID:', item.id);
+      const response = await rfpService.getRFPById(item.id);
+      console.log('Edit API Response:', response);
+      
+      // Extract the data from the response
+      const rfpData = response.data?.data || response.data || response;
+      console.log('Edit Extracted RFP Data:', rfpData);
+      
+      if (!rfpData) {
+        console.error('No data received from API for edit');
+        throw new Error('No data received from API for edit');
+      }
+      
+      // Use the same mapping logic as handleView
+      const mappedRFP = {
+        // Opportunity fields
+        opportunity: {
+          id: rfpData.opportunityId || rfpData.opportunity?.id || '',
+          opportunity_name: rfpData.opportunityName || rfpData.opportunity?.name || '',
+          client_name: rfpData.clientName || rfpData.opportunity?.client_name || '',
+          ...(rfpData.opportunity || {})
+        },
+        
+        // RFP Details
+        rfpDetails: {
+          rfpTitle: rfpData.rfpTitle || '',
+          rfpType: rfpData.rfpType || 'RFP',
+          rfpStatus: rfpData.rfpStatus || 'Draft',
+          rfbDescription: rfpData.rfpDescription || rfpData.description || '',
+          solutionDescription: rfpData.solutionDescription || '',
+          submissionDeadline: rfpData.submissionDeadline || '',
+          bidManager: rfpData.bidManager || '',
+          submissionMode: rfpData.submissionMode || 'Email',
+          portalUrl: rfpData.portalUrl || '',
+          questionSubmissionDate: rfpData.questionSubmissionDate || '',
+          responseSubmissionDate: rfpData.responseSubmissionDate || '',
+          comments: rfpData.comments || '',
+          qaLogs: rfpData.qaLogs || []
+        },
+        
+        // Documents
+        rfpDocuments: Array.isArray(rfpData.documents) ? rfpData.documents : [],
+        
+        // Edit mode flag (different from view mode)
+        isViewMode: false,
+        
+        // Map direct fields for backward compatibility
+        id: rfpData.id,
+        rfpTitle: rfpData.rfpTitle || '',
+        rfpDescription: rfpData.rfpDescription || '',
+        solutionDescription: rfpData.solutionDescription || '',
+        submissionDeadline: rfpData.submissionDeadline || '',
+        bidManager: rfpData.bidManager || '',
+        submissionMode: rfpData.submissionMode || 'Email',
+        portalUrl: rfpData.portalUrl || '',
+        questionSubmissionDate: rfpData.questionSubmissionDate || '',
+        responseSubmissionDate: rfpData.responseSubmissionDate || '',
+        comments: rfpData.comments || '',
+        documents: Array.isArray(rfpData.documents) ? rfpData.documents : []
+      };
+      
+      console.log('Mapped Edit RFP Data:', mappedRFP);
+      setSelectedRFP(mappedRFP);
       setViewRFPDialogOpen(true);
     } catch (error) {
       console.error('Error fetching RFP details for edit:', error);
@@ -539,56 +661,43 @@ const RFPDetails = () => {
       </div>
       <AddRFPDialog />
       
-      {/* View RFP Dialog */}
+      {/* View/Edit RFP Dialog */}
       <Dialog open={viewRFPDialogOpen} onOpenChange={setViewRFPDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Opportunity-RFP</DialogTitle>
+            <DialogTitle>
+              {isEditMode ? 'Edit RFP' : 'View RFP Details'}
+            </DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <OpportunityFormTabbed 
-              showOnlyRFP={true}
-              onClose={() => {
-                setViewRFPDialogOpen(false);
-                setIsEditMode(false);
-              }}
-              onSuccess={() => {
-                setViewRFPDialogOpen(false);
-                setIsEditMode(false);
-                // Refresh the RFP list
-                fetchRFPs();
-              }}
-              opportunity={{
-                ...selectedRFP,
-                isViewMode: !isEditMode,  // Only set view mode if not in edit mode
-                // Map exact field names from API response
-                id: selectedRFP?.id,
-                rfpTitle: selectedRFP?.rfpTitle,
-                rfpStatus: selectedRFP?.rfpStatus,
-                rfpType: selectedRFP?.rfpType,
-                rfpDescription: selectedRFP?.rfpDescription,
-                solutionDescription: selectedRFP?.solutionDescription,
-                submissionDeadline: selectedRFP?.submissionDeadline,
-                bidManager: selectedRFP?.bidManager,
-                submissionMode: selectedRFP?.submissionMode,
-                portalUrl: selectedRFP?.portalUrl,
-                // Map to the expected fields in OpportunityFormTabbed
-                name: selectedRFP?.rfpTitle,
-                description: selectedRFP?.rfpDescription,
-                status: selectedRFP?.rfpStatus,
-                opportunityName: selectedRFP?.opportunityName,
-                // Add other fields from the API response
-                questionSubmissionDate: selectedRFP?.questionSubmissionDate,
-                responseSubmissionDate: selectedRFP?.responseSubmissionDate,
-                comments: selectedRFP?.comments,
-                createdAt: selectedRFP?.createdAt,
-                updatedAt: selectedRFP?.updatedAt,
-                opportunityId: selectedRFP?.opportunityId,
-                createdBy: selectedRFP?.createdBy,
-                createdByEmail: selectedRFP?.createdByEmail,
-                documents: selectedRFP?.documents || []
-              }}
-            />
+            {selectedRFP && (
+             <OpportunityFormTabbed
+  showOnlyRFP={true}
+  onClose={() => {
+    setViewRFPDialogOpen(false);
+    setIsEditMode(false);
+  }}
+  onSuccess={() => {
+    setViewRFPDialogOpen(false);
+    setIsEditMode(false);
+    fetchRFPs();
+  }}
+  // Hide Add button in edit mode
+  hideAddButton={isEditMode}
+  // Set view mode based on edit mode
+  isViewMode={!isEditMode}
+  // Set edit mode
+  isEditMode={isEditMode}
+  // Pass the opportunity data
+  opportunity={{
+    ...selectedRFP,
+    // Ensure we're not in view mode when editing
+    isViewMode: !isEditMode
+  }}
+  // Set the button text based on the mode
+  buttonText={isEditMode ? 'Update' : 'View'}
+/>
+            )}
           </div>
         </DialogContent>
       </Dialog>

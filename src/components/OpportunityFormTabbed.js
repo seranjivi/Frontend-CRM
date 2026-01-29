@@ -220,14 +220,12 @@ const PIPELINE_STATUSES = [
         const filterUsersByRole = (roles) => {
           if (!allUsers.length) return [];
           
-          console.log('Filtering users with roles:', roles);
           
           // If no specific roles provided, return all users with any role
           if (!roles || roles.length === 0) {
             return allUsers.filter(user => {
               const userRole = (user.role_name || (user.roles && user.roles[0]?.name) || '').toLowerCase();
               const hasRole = userRole !== '';
-              console.log(`User ${user.full_name || user.email} - Role: ${userRole} - Has role: ${hasRole}`);
               return hasRole;
             });
           }
@@ -265,7 +263,6 @@ const PIPELINE_STATUSES = [
               userRoles.some(userRole => userRole === role.toLowerCase())
             );
             
-            console.log(`User ${user.full_name || user.email} - Roles: ${userRoles.join(', ')} - Matches ${roles.join(', ')}: ${hasMatchingRole}`);
             
             return hasMatchingRole;
           });
@@ -280,10 +277,7 @@ const PIPELINE_STATUSES = [
         // For Presales POC, include presales roles and any user with presales in their role
         const presalesPocUsers = filterUsersByRole(['presales lead', 'presales member', 'presales']);
         
-        console.log('Technical POC Users:', technicalPocUsers.map(u => u.full_name || u.email));
-        console.log('Sales POC Users:', salesPocUsers.map(u => u.full_name || u.email));
-        console.log('Presales POC Users:', presalesPocUsers.map(u => u.full_name || u.email));
-
+      
         setUsers({
           all: allUsers,
           technicalPocUsers,
@@ -561,7 +555,6 @@ const PIPELINE_STATUSES = [
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submitted with data:', formData);
 
     try {
       // Handle SOW creation if in SOW tab
@@ -574,7 +567,6 @@ const PIPELINE_STATUSES = [
           // 1. First, get the RFP for this opportunity
           const opportunityId = opportunity?.id || opportunity?.opportunity?.id;
           const rfpResponse = await rfpService.getRFPsByOpportunityId(opportunityId);
-          console.log('RFP response:', rfpResponse);
 
           if (!rfpResponse.data || !rfpResponse.data.id) {
             throw new Error('No RFP found for this opportunity');
