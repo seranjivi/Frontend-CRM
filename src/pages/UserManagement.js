@@ -60,32 +60,41 @@ const fetchUsers = async () => {
   }
 };
 
-  const handleEdit = async (user) => {
-    try {
-      const userData = await userService.getUserById(user.id);
-      console.log('User data from API:', userData); // Debug log
-      
-      // Transform the data to match the expected format for the form
-      const formattedUser = {
-        ...userData,
-        full_name: userData.full_name || userData.name || '',
-        email: userData.email || '',
-        role: userData.role || (Array.isArray(userData.roles) ? userData.roles[0]?.id : ''),
-        role_id: userData.role_id || (Array.isArray(userData.roles) ? userData.roles[0]?.id : ''),
-        role_name: userData.role_name || (Array.isArray(userData.roles) ? userData.roles[0]?.name : ''),
-        status: (userData.status || 'active').toLowerCase(),
-        assigned_regions: userData.regions || userData.assigned_regions || [],
-        id: userData.id || user.id
-      };
-      
-      console.log('Formatted user data:', formattedUser); // Debug log
-      setEditingUser(formattedUser);
-      setShowForm(true);
-    } catch (error) {
-      console.error('Error fetching user details:', error);
-      toast.error(`Failed to fetch user details: ${error.message || 'Unknown error'}`);
-    }
-  };
+const handleEdit = async (user) => {
+  try {
+    const response = await userService.getUserById(user.id);
+    const userData = response.data;
+    console.log('User data from API:', userData);
+
+    // Get role names from the API response
+    const roleNames = userData.roles || [];
+    
+    // Format roles as objects with id and name for the form
+    const roles = roleNames.map(roleName => ({
+      id: roleName,  // Use the role name as ID if no ID is available
+      name: roleName
+    }));
+
+    const formattedUser = {
+      ...userData,
+      full_name: userData.full_name || '',
+      email: userData.email || '',
+      // Format expected by UserForm
+      roles: roles.map(role => role.id),  // Array of role IDs
+      roleNames: roles.map(role => role.name),  // Array of role names
+      status: (userData.status || 'active').toLowerCase(),
+      assigned_regions: userData.regions || [],
+      id: userData.id || user.id
+    };
+    
+    console.log('Formatted user data:', formattedUser);
+    setEditingUser(formattedUser);
+    setShowForm(true);
+  } catch (error) {
+    console.error('Error fetching user details:', error);
+    toast.error(`Failed to fetch user details: ${error.message || 'Unknown error'}`);
+  }
+};
 
   const handleFormClose = () => {
     setShowForm(false);
