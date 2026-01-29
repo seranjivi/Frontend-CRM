@@ -71,14 +71,21 @@ const Layout = ({ children }) => {
     { name: 'Settings', href: '/settings', icon: Settings, permission: 'settings' },
   ];
 
+  // Debug: Log user object and roles
+  console.log('Current user:', user);
+  console.log('User roles:', user?.roles);
+
   // Filter navigation items based on user permissions
   const navigation = allNavigationItems.filter(item => {
     // Always show Dashboard for all authenticated users
     if (item.permission === 'dashboard') return true;
     
-    // If user is admin, show specific tabs including leads
-    if (user?.role === 'Admin') {
-      return ['clients', 'opportunities', 'user_management', 'leads'].includes(item.permission);
+    // Check if user has admin role (case-insensitive and handles array or string roles)
+    const userRoles = Array.isArray(user?.roles) ? user.roles : [user?.role];
+    const isAdmin = userRoles.some(role => role?.toLowerCase() === 'admin');
+    
+    if (isAdmin) {
+      return ['clients', 'opportunities', 'user_management'].includes(item.permission);
     }
     
     // If user is Sales Head, show only Dashboard and Clients
