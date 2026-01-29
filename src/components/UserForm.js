@@ -56,20 +56,13 @@ useEffect(() => {
       : 'active';
     
     // Handle both array and single role cases
-    const roles = Array.isArray(user.roles) 
-      ? user.roles 
-      : user.role_id ? [user.role_id] : [];
-    
-    const roleNames = Array.isArray(user.roles)
-      ? availableRoles
-          .filter(r => user.roles.includes(r.id))
-          .map(r => r.name)
-      : user.role ? [user.role] : [];
+    const roleNames = user.roleNames || 
+                     (Array.isArray(user.roles) ? user.roles : []);
     
     setFormData({
       full_name: user.full_name || user.name || '',
       email: user.email || '',
-      roles: roles,
+      roles: roleNames, // Use the role names directly
       roleNames: roleNames,
       status: normalizedStatus,
       assigned_regions: Array.isArray(user.assigned_regions)
