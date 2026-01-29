@@ -107,26 +107,25 @@ const fetchUsers = async () => {
   const columns = [
     { key: 'full_name', header: 'Full Name' },
     { key: 'email', header: 'Email Address' },
-    {
-      key: 'role', 
-      header: 'Access Role',
-      render: (value, row) => {
-        // Get the role from the most reliable source
-        const role = row.role_name || 
-                    (row.roles && row.roles[0]?.name) || 
-                    row.role ||
-                    'No Role Assigned';
-                    
-        return (
-          <span className="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
-            {role}
-          </span>
-        );
-      },
-    },
+   {
+  key: 'role', 
+  header: 'Access Role',
+  render: (value, row) => {
+    // Get the roles array from the row
+    const roles = row.roles || [];
+    // Join the roles array with comma and space, or show 'No Role Assigned' if empty
+    const roleText = roles.length > 0 ? roles.join(', ') : 'No Role Assigned';
+    
+    return (
+      <span className="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
+        {roleText}
+      </span>
+    );
+  },
+},
     {
       key: 'assigned_regions',
-      header: 'Assigned Regionss',
+      header: 'Assigned Regions',
       render: (value) => (
         <div className="flex flex-wrap gap-1">
           {value && value.length > 0 ? (
