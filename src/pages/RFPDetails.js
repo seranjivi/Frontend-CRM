@@ -22,12 +22,16 @@ import { saveAs } from 'file-saver';
 import DataTable from '../components/DataTable';
 import rfpService from '../services/rfpService';
 import { toast } from 'sonner';
+import OpportunityFormTabbed from '../components/OpportunityFormTabbed';
 
 const RFPDetails = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAddRFPDialogOpen, setIsAddRFPDialogOpen] = useState(false);
+  const [viewRFPDialogOpen, setViewRFPDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedRFP, setSelectedRFP] = useState(null);
   const [newRFP, setNewRFP] = useState({
     opportunityName: '',
     rfpTitle: '',
@@ -203,12 +207,34 @@ const RFPDetails = () => {
     saveAs(blob, `rfp_export_${new Date().toISOString().split('T')[0]}.csv`);
   };
   // Handlers for table actions
-  const handleView = (item) => {
-    // Add your view logic here
+  const handleView = async (item) => {
+    try {
+      setLoading(true);
+      setIsEditMode(false);
+      const rfpDetails = await rfpService.getRFPById(item.id);
+      setSelectedRFP(rfpDetails);
+      setViewRFPDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching RFP details:', error);
+      toast.error('Failed to load RFP details');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEdit = (item) => {
-    // Add your edit logic here
+  const handleEdit = async (item) => {
+    try {
+      setLoading(true);
+      setIsEditMode(true);
+      const rfpDetails = await rfpService.getRFPById(item.id);
+      setSelectedRFP(rfpDetails);
+      setViewRFPDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching RFP details for edit:', error);
+      toast.error('Failed to load RFP details for editing');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (item) => {
@@ -512,6 +538,60 @@ const RFPDetails = () => {
         />
       </div>
       <AddRFPDialog />
+      
+      {/* View RFP Dialog */}
+      <Dialog open={viewRFPDialogOpen} onOpenChange={setViewRFPDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Opportunity-RFP</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <OpportunityFormTabbed 
+              showOnlyRFP={true}
+              onClose={() => {
+                setViewRFPDialogOpen(false);
+                setIsEditMode(false);
+              }}
+              onSuccess={() => {
+                setViewRFPDialogOpen(false);
+                setIsEditMode(false);
+                // Refresh the RFP list
+                fetchRFPs();
+              }}
+              opportunity={{
+                ...selectedRFP,
+                isViewMode: !isEditMode,  // Only set view mode if not in edit mode
+                // Map exact field names from API response
+                id: selectedRFP?.id,
+                rfpTitle: selectedRFP?.rfpTitle,
+                rfpStatus: selectedRFP?.rfpStatus,
+                rfpType: selectedRFP?.rfpType,
+                rfpDescription: selectedRFP?.rfpDescription,
+                solutionDescription: selectedRFP?.solutionDescription,
+                submissionDeadline: selectedRFP?.submissionDeadline,
+                bidManager: selectedRFP?.bidManager,
+                submissionMode: selectedRFP?.submissionMode,
+                portalUrl: selectedRFP?.portalUrl,
+                // Map to the expected fields in OpportunityFormTabbed
+                name: selectedRFP?.rfpTitle,
+                description: selectedRFP?.rfpDescription,
+                status: selectedRFP?.rfpStatus,
+                opportunityName: selectedRFP?.opportunityName,
+                // Add other fields from the API response
+                questionSubmissionDate: selectedRFP?.questionSubmissionDate,
+                responseSubmissionDate: selectedRFP?.responseSubmissionDate,
+                comments: selectedRFP?.comments,
+                createdAt: selectedRFP?.createdAt,
+                updatedAt: selectedRFP?.updatedAt,
+                opportunityId: selectedRFP?.opportunityId,
+                createdBy: selectedRFP?.createdBy,
+                createdByEmail: selectedRFP?.createdByEmail,
+                documents: selectedRFP?.documents || []
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
