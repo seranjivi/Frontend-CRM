@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
-import { Plus, Search, Download, Upload, FileText, Eye, Edit2, MoreHorizontal } from 'lucide-react';
+import { Plus, Search, Download, Upload, FileText, Eye, Edit2, MoreHorizontal, Trash2 } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
@@ -10,6 +10,7 @@ import { Dialog, DialogContent } from '../components/ui/dialog';
 import { Badge } from '../components/ui/badge';
 import DataTable from '../components/DataTable';
 import sowService from '../services/sowService';
+import SOWViewDialog from '../components/SOWViewDialog';
 
 const SOWs = () => {
   const navigate = useNavigate();
@@ -17,6 +18,8 @@ const SOWs = () => {
   const [loading, setLoading] = useState(false); 
   const [showForm, setShowForm] = useState(false);
   const [editingSOW, setEditingSOW] = useState(null);
+  const [viewingSOW, setViewingSOW] = useState(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
     status: 'All Status',
     client: 'All Clients'
@@ -122,12 +125,19 @@ const SOWs = () => {
   };
 
   const handleViewSOW = (sow) => {
-    navigate(`/sow/${sow.id}`);
+    setViewingSOW(sow);
+    setIsViewDialogOpen(true);
+  };
+
+  const handleCloseViewDialog = () => {
+    setIsViewDialogOpen(false);
+    setViewingSOW(null);
   };
 
   const handleEditSOW = (sow) => {
     setEditingSOW(sow);
     setShowForm(true);
+    setIsViewDialogOpen(false);
   };
 
   const handleFormSubmit = async (sowData) => {
@@ -155,15 +165,16 @@ const SOWs = () => {
     // Handle import SOW
   };
 
-  const handleDelete = async (sow) => {
+  const handleDeleteSOW = async (sow) => {
     if (window.confirm(`Are you sure you want to delete ${sow.title}?`)) {
       try {
         setLoading(true);
-        // Extract numeric ID from SOW-{id} format
         const numericId = sow.id.replace('SOW-', '');
         await sowService.deleteSOW(numericId);
-        // Refresh the SOWs list after successful deletion
-        fetchSOWs();
+        // Update local state instead of refetching
+        setSOWs(prev => prev.filter(s => s.id !== sow.id));
+        setFilteredSOWs(prev => prev.filter(s => s.id !== sow.id));
+        setIsViewDialogOpen(false);
         toast.success('SOW deleted successfully');
       } catch (error) {
         console.error('Error deleting SOW:', error);
@@ -179,7 +190,12 @@ const SOWs = () => {
       key: 'title',
       header: 'SOW Title',
       render: (_, row) => (
-        <div className="font-medium text-gray-900">{row.title}</div>
+        <div 
+          className="font-medium text-blue-600 hover:underline cursor-pointer"
+          onClick={() => handleViewSOW(row)}
+        >
+          {row.title}
+        </div>
       ),
     },
     { key: 'client', header: 'Client' },
@@ -201,6 +217,41 @@ const SOWs = () => {
       className: 'text-right',
     },
   ];
+
+  const customActions = (row) => (
+    <div className="flex items-center space-x-1">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => handleViewSOW(row)}
+        className="h-8 w-8 p-0 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+        title="View SOW"
+      >
+        <Eye className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => handleEditSOW(row)}
+        className="h-8 w-8 p-0 hover:bg-gray-100 text-blue-600 hover:text-blue-700"
+        title="Edit SOW"
+      >
+        <Edit2 className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleDeleteSOW(row);
+        }}
+        className="h-8 w-8 p-0 hover:bg-gray-100 text-red-600 hover:text-red-700"
+        title="Delete SOW"
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -256,9 +307,7 @@ const SOWs = () => {
       <DataTable
         data={filteredSOWs}
         columns={columns}
-        onView={handleViewSOW}
-        onEdit={handleEditSOW}
-        onDelete={handleDelete}
+        customActions={customActions}
         onExport={() => {
           // Handle export logic here
           toast.success('Exporting SOWs...');
@@ -313,6 +362,15 @@ const SOWs = () => {
           />
         </DialogContent>
       </Dialog>
+
+      {/* SOW View Dialog */}
+      <SOWViewDialog
+        open={isViewDialogOpen}
+        onClose={handleCloseViewDialog}
+        sowData={viewingSOW}
+        onEdit={() => handleEditSOW(viewingSOW)}
+        onDelete={() => handleDeleteSOW(viewingSOW)}
+      />
     </div>
   );
 };
