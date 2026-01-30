@@ -140,8 +140,26 @@ const SOWViewDialog = ({
                   {/* Target Kickoff Date */}
                   <div>
                     <p className="text-sm font-medium text-gray-700 mb-1">Target Kickoff Date</p>
-                    <div className="border rounded-md px-3 py-2 text-sm">
-                      {sowData.targetKickoffDate ? formatDate(sowData.targetKickoffDate) : '-'}
+                    <div className="relative">
+                      <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                        <span className="text-sm">
+{sowData.target_kickoff_date ? format(new Date(sowData.target_kickoff_date), 'MMM d, yyyy') : 'Select kickoff date'}
+
+                        </span>
+                        <svg 
+                          className="h-4 w-4 text-gray-400" 
+                          fill="none" 
+                          viewBox="0 0 24 24" 
+                          stroke="currentColor"
+                        >
+                          <path 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            strokeWidth={2} 
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" 
+                          />
+                        </svg>
+                      </div>
                     </div>
                   </div>
 
@@ -149,19 +167,18 @@ const SOWViewDialog = ({
                   <div className="md:col-span-2">
                     <p className="text-sm font-medium text-gray-700 mb-1">Linked Proposal Reference</p>
                     <div className="border rounded-md px-3 py-2 text-sm">
-                      {sowData.linkedProposalRef || '-'}
+                      {sowData.linked_proposal_reference || '-'}
                     </div>
                   </div>
 
                   {/* Scope Overview */}
                   <div className="md:col-span-2">
-                    <p className="text-sm font-medium text-gray-700 mb-1">Scope Overview</p>
-                    <div className="border rounded-md p-3">
-                      <p className="text-gray-700 whitespace-pre-line text-sm">
-                        {sowData.scopeOverview || 'No scope overview provided.'}
-                      </p>
-                    </div>
-                  </div>
+        <p className="text-sm font-medium text-gray-700 mb-1">Scope Overview</p>
+        <div className="border rounded-md p-3">
+          {sowData.scope_overview || '-'}
+        </div>
+      </div>
+
                   </div>
                 </CardContent>
               </Card>

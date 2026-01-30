@@ -124,9 +124,31 @@ const SOWs = () => {
     setShowForm(true);
   };
 
-  const handleViewSOW = (sow) => {
-    setViewingSOW(sow);
-    setIsViewDialogOpen(true);
+  const handleViewSOW = async (sow) => {
+    try {
+      setLoading(true);
+      // Fetch the full SOW details using the numeric ID
+      const numericId = sow.id.replace('SOW-', '');
+      const fullSOW = await sowService.getSOW(numericId);
+      setViewingSOW({
+        ...sow,
+        ...fullSOW, // This will merge any additional fields from the API
+        // Map any necessary fields that might be named differently in the API
+        sow_id: fullSOW.sow_id,
+        sow_title: fullSOW.sow_title,
+        sow_status: fullSOW.sow_status,
+        client_name: fullSOW.client_name,
+        target_kickoff_date: fullSOW.target_kickoff_date,
+        contract_value: fullSOW.contract_value,
+        contract_currency: fullSOW.contract_currency
+      });
+      setIsViewDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching SOW details:', error);
+      toast.error('Failed to load SOW details');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCloseViewDialog = () => {

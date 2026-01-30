@@ -600,7 +600,7 @@ const PIPELINE_STATUSES = [
           if (onSuccess) onSuccess(result);
           if (onClose) onClose();
           // Redirect to /sows page after successful creation
-            window.location.href = '/sows';
+            // window.location.href = '/sows';
 
         } catch (error) {
           console.error('Error in SOW creation flow:', error);
@@ -1975,16 +1975,19 @@ const PIPELINE_STATUSES = [
 
                   {/* Target Kickoff Date */}
                   <div>
-                    <Label>Target Kickoff Date</Label>
-                    <DateField
-                      selected={formData.sowDetails.targetKickoffDate ? new Date(formData.sowDetails.targetKickoffDate) : null}
-                      onChange={(date) => updateSowDetails('targetKickoffDate', date)}
-                      minDate={new Date()}
-                      placeholderText="Select kickoff date"
-                      showTimeSelect
-                      timeFormat="HH:mm"
-                      timeIntervals={15}
-                      dateFormat="MMMM d, yyyy h:mm aa"
+                    <Label htmlFor="targetKickoffDate">Target Kickoff Date</Label>
+                    <Input
+                      id="targetKickoffDate"
+                      type="date"
+                      value={
+                        formData.sowDetails.targetKickoffDate
+                          ? formatDateForInput(formData.sowDetails.targetKickoffDate)
+                          : ''
+                      }
+                      onChange={(e) =>
+                        updateSowDetails('targetKickoffDate', e.target.value)
+                      }
+                      min={new Date().toISOString().split('T')[0]}
                     />
                   </div>
 
