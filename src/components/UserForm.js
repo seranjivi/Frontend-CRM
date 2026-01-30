@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { Checkbox } from '../components/ui/checkbox';
+import { ChevronDown, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import roleService from '../services/roleService';
 
@@ -33,8 +34,8 @@ const UserForm = ({ user, onClose }) => {
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
-    role: '',
-    roleName: '',
+    roles: [],
+    roleNames: [],
     status: 'active', // Default to active
     assigned_regions: [],
   });
@@ -42,29 +43,34 @@ const UserForm = ({ user, onClose }) => {
   const [availableRoles, setAvailableRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingRoles, setLoadingRoles] = useState(true);
+  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
 
   /* ------------------ INIT FORM DATA ------------------ */
 
-  useEffect(() => {
-    if (user) {
-      // Normalize status to match the expected values in the Select component
-      const normalizedStatus = user.status 
-        ? user.status.trim().toLowerCase() === 'inactive' ? 'inactive' : 'active'
-        : 'active';
-      
-      setFormData({
-        full_name: user.full_name || '',
-        email: user.email || '',
-        role: user.role_id || '',
-        roleName: user.role || '',
-        status: normalizedStatus,
-        assigned_regions: Array.isArray(user.regions)
-          ? user.regions.map((r) => r.id)
-          : [],
-      });
-    }
-  }, [user]);
-
+  // In UserForm.js, update the useEffect that initializes form data
+useEffect(() => {
+  if (user) {
+    // Normalize status to match the expected values
+    const normalizedStatus = user.status 
+      ? user.status.trim().toLowerCase() === 'inactive' ? 'inactive' : 'active'
+      : 'active';
+    
+    // Handle both array and single role cases
+    const roleNames = user.roleNames || 
+                     (Array.isArray(user.roles) ? user.roles : []);
+    
+    setFormData({
+      full_name: user.full_name || user.name || '',
+      email: user.email || '',
+      roles: roleNames, // Use the role names directly
+      roleNames: roleNames,
+      status: normalizedStatus,
+      assigned_regions: Array.isArray(user.assigned_regions)
+        ? user.assigned_regions
+        : (Array.isArray(user.regions) ? user.regions.map(r => r.id || r) : [])
+    });
+  }
+}, [user, availableRoles]);
   /* ------------------ FETCH ROLES ------------------ */
 
   useEffect(() => {
@@ -104,17 +110,31 @@ const UserForm = ({ user, onClose }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleRoleChange = (value) => {
-    const selected = availableRoles.find(
-      (r) => r.id.toString() === value
-    );
-    if (selected) {
-      setFormData((prev) => ({
+  const toggleRole = (role) => {
+    setFormData(prev => {
+      const roleIndex = prev.roles.indexOf(role.id);
+      let newRoles, newRoleNames;
+      
+      if (roleIndex === -1) {
+        // Add role
+        newRoles = [...prev.roles, role.id];
+        newRoleNames = [...prev.roleNames, role.name];
+      } else {
+        // Remove role
+        newRoles = prev.roles.filter(id => id !== role.id);
+        newRoleNames = prev.roleNames.filter(name => name !== role.name);
+      }
+      
+      return {
         ...prev,
-        role: selected.id,
-        roleName: selected.name,
-      }));
-    }
+        roles: newRoles,
+        roleNames: newRoleNames
+      };
+    });
+  };
+  
+  const isRoleSelected = (roleId) => {
+    return formData.roles.includes(roleId);
   };
 
   const handleRegionChange = (regionId, checked) => {
@@ -135,7 +155,7 @@ const UserForm = ({ user, onClose }) => {
     const payload = {
       full_name: formData.full_name,
       email: formData.email,
-      role: formData.roleName,
+      roles: formData.roleNames,
       status: formData.status, // ✅ active / inactive
       regions: formData.assigned_regions,
     };
@@ -186,24 +206,46 @@ const UserForm = ({ user, onClose }) => {
           />
         </div>
 
-        <div>
-          <Label>Access Role</Label>
-          <Select
-            value={formData.role?.toString()}
-            onValueChange={handleRoleChange}
-            disabled={loadingRoles}
+        <div className="relative">
+          <Label>Access Roles</Label>
+          <div 
+            className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 cursor-pointer"
+            onClick={() => !loadingRoles && setIsRoleDropdownOpen(!isRoleDropdownOpen)}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Select role" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableRoles.map((r) => (
-                <SelectItem key={r.id} value={r.id.toString()}>
-                  {r.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <span className="text-muted-foreground">
+              {formData.roleNames.length > 0 
+                ? formData.roleNames.join(', ')
+                : 'Select roles'}
+            </span>
+            <ChevronDown className="h-4 w-4 opacity-50" />
+          </div>
+          
+          {isRoleDropdownOpen && (
+            <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-80">
+              <div className="p-1 max-h-60 overflow-auto">
+                {availableRoles.map((role) => (
+                  <div 
+                    key={role.id}
+                    className="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleRole(role);
+                    }}
+                  >
+                    <span className={`absolute left-2 flex h-3.5 w-3.5 items-center justify-center ${isRoleSelected(role.id) ? 'opacity-100' : 'opacity-0'}`}>
+                      <Check className="h-4 w-4" />
+                    </span>
+                    {role.name}
+                  </div>
+                ))}
+                {availableRoles.length === 0 && (
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    No roles available
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div>
