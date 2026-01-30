@@ -13,6 +13,9 @@ const SOWViewDialog = ({
   sowData,
   onEdit,
   onDelete,
+  isEditMode = false,
+  onUpdate,
+  onCancelEdit
 }) => {
   if (!sowData) return null;
 
@@ -61,7 +64,7 @@ const SOWViewDialog = ({
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-6">
         <DialogHeader>
           <div className="space-y-1">
-            <DialogTitle className="text-xl">View SOW Details</DialogTitle>
+            <DialogTitle className="text-xl">{isEditMode ? 'Edit SOW' : 'View SOW Details'}</DialogTitle>
           </div>
         </DialogHeader>
 
@@ -83,33 +86,53 @@ const SOWViewDialog = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <p className="text-sm font-medium text-gray-700 mb-1">SOW Title <span className="text-red-600">*</span></p>
-                      <div className="border rounded-md px-3 py-2 text-sm">
-                        {sowData.sowTitle || sowData.title || '-'}
-                      </div>
+                      {isEditMode ? (
+                        <input
+                          type="text"
+                          defaultValue={sowData.sowTitle || sowData.title || ''}
+                          className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <div className="border rounded-md px-3 py-2 text-sm">
+                          {sowData.sowTitle || sowData.title || '-'}
+                        </div>
+                      )}
                     </div>
 
                     {/* Status */}
                     <div>
                       <p className="text-sm font-medium text-gray-700 mb-1">Status</p>
                       <div className="relative">
-                        <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
-                          <span className="text-sm">
-                            {sowData.sowStatus || sowData.status || 'Select status'}
-                          </span>
-                          <svg 
-                            className="h-4 w-4 text-gray-400" 
-                            fill="none" 
-                            viewBox="0 0 24 24" 
-                            stroke="currentColor"
+                        {isEditMode ? (
+                          <select
+                            defaultValue={sowData.sowStatus || sowData.status || ''}
+                            className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                           >
-                            <path 
-                              strokeLinecap="round" 
-                              strokeLinejoin="round" 
-                              strokeWidth={2} 
-                              d="M19 9l-7 7-7-7" 
-                            />
-                          </svg>
-                        </div>
+                            <option value="Draft">Draft</option>
+                            <option value="In Review">In Review</option>
+                            <option value="Active">Active</option>
+                            <option value="Expired">Expired</option>
+                          </select>
+                        ) : (
+                          <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                            <span className="text-sm">
+                              {sowData.sowStatus || sowData.status || 'Select status'}
+                            </span>
+                            <svg 
+                              className="h-4 w-4 text-gray-400" 
+                              fill="none" 
+                              viewBox="0 0 24 24" 
+                              stroke="currentColor"
+                            >
+                              <path 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                strokeWidth={2} 
+                                d="M19 9l-7 7-7-7" 
+                              />
+                            </svg>
+                          </div>
+                        )}
                         {/* <div className="mt-1">
                           {getStatusBadge(sowData.sowStatus || sowData.status)}
                         </div> */}
@@ -128,56 +151,64 @@ const SOWViewDialog = ({
                             type="number"
                             min="0"
                             step="0.01"
-                            value={sowData.contractValue || sowData.value || ''}
-                            readOnly
-                            className="w-full h-full border-t border-b border-r rounded-r-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            defaultValue={sowData.contractValue || sowData.value || ''}
+                            readOnly={!isEditMode}
+                            className={`w-full h-full border-t border-b border-r rounded-r-md px-3 py-2 text-sm focus:outline-none focus:ring-1 ${isEditMode ? 'focus:ring-blue-500' : ''}`}
                             placeholder="0.00"
                           />
                         </div>
                       </div>
                     </div>
 
-                  {/* Target Kickoff Date */}
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-1">Target Kickoff Date</p>
-                    <div className="relative">
-                      <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
-                        <span className="text-sm">
-{sowData.target_kickoff_date ? format(new Date(sowData.target_kickoff_date), 'MMM d, yyyy') : 'Select kickoff date'}
+                    {/* Target Kickoff Date */}
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Target Kickoff Date</p>
+                      <div className="relative">
+                        <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                          <span className="text-sm">
+                            {sowData.target_kickoff_date ? format(new Date(sowData.target_kickoff_date), 'MMM d, yyyy') : 'Select kickoff date'}
 
-                        </span>
-                        <svg 
-                          className="h-4 w-4 text-gray-400" 
-                          fill="none" 
-                          viewBox="0 0 24 24" 
-                          stroke="currentColor"
-                        >
-                          <path 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round" 
-                            strokeWidth={2} 
-                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" 
-                          />
-                        </svg>
+                          </span>
+                          <svg 
+                            className="h-4 w-4 text-gray-400" 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round" 
+                              strokeWidth={2} 
+                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" 
+                            />
+                          </svg>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Linked Proposal Reference */}
-                  <div className="md:col-span-2">
-                    <p className="text-sm font-medium text-gray-700 mb-1">Linked Proposal Reference</p>
-                    <div className="border rounded-md px-3 py-2 text-sm">
-                      {sowData.linked_proposal_reference || '-'}
+                    {/* Linked Proposal Reference */}
+                    <div className="md:col-span-2">
+                      <p className="text-sm font-medium text-gray-700 mb-1">Linked Proposal Reference</p>
+                      <div className="border rounded-md px-3 py-2 text-sm">
+                        {sowData.linked_proposal_reference || '-'}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Scope Overview */}
-                  <div className="md:col-span-2">
-        <p className="text-sm font-medium text-gray-700 mb-1">Scope Overview</p>
-        <div className="border rounded-md p-3">
-          {sowData.scope_overview || '-'}
-        </div>
-      </div>
+                    {/* Scope Overview */}
+                    <div className="md:col-span-2">
+                      <p className="text-sm font-medium text-gray-700 mb-1">Scope Overview</p>
+                      {isEditMode ? (
+                        <textarea
+                          defaultValue={sowData.scope_overview || ''}
+                          className="w-full border rounded-md p-3 h-32 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          placeholder="Enter scope overview..."
+                        />
+                      ) : (
+                        <div className="border rounded-md p-3">
+                          {sowData.scope_overview || '-'}
+                        </div>
+                      )}
+                    </div>
 
                   </div>
                 </CardContent>
@@ -213,11 +244,46 @@ const SOWViewDialog = ({
                 </CardContent>
               </Card>
             </TabsContent>
-
-            {/* Removed disabled tabs content */}
-
           </div>
         </Tabs>
+
+        {/* Action Buttons */}
+        <div className="flex justify-end space-x-3 mt-6">
+          {isEditMode ? (
+            <>
+              <Button 
+                variant="outline" 
+                onClick={onCancelEdit}
+                className="px-4"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={onUpdate}
+                className="px-6 bg-blue-600 hover:bg-blue-700"
+              >
+                Update
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button 
+                variant="outline" 
+                onClick={onClose}
+                className="px-4"
+              >
+                Close
+              </Button>
+              {/* <Button 
+                variant="outline"
+                onClick={onEdit}
+                className="px-4"
+              >
+                Edit
+              </Button> */}
+            </>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
