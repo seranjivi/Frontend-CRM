@@ -71,9 +71,7 @@ const Layout = ({ children }) => {
     { name: 'Settings', href: '/settings', icon: Settings, permission: 'settings' },
   ];
 
-  // Debug: Log user object and roles
-  console.log('Current user:', user);
-  console.log('User roles:', user?.roles);
+
 
   // Filter navigation items based on user permissions
   const navigation = allNavigationItems.filter(item => {

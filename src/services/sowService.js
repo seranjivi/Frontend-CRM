@@ -71,7 +71,7 @@ const sowService = {
   // Get SOW by ID
   getSOW: async (id) => {
     try {
-      const response = await api.get(`/api/sows/${id}`);
+      const response = await api.get(`/sows/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching SOW ${id}:`, error);
