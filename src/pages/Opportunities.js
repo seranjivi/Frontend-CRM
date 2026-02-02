@@ -60,20 +60,42 @@ const Opportunities = () => {
   const filteredOpportunities = useMemo(() => {
     return opportunities.filter(opp => {
       // Filter by opportunity name (search)
-      const matchesSearch = filters.opportunityName === 'All Leads' || 
+      const matchesSearch = filters.opportunityName === 'All Leads' ||
         !filters.opportunityName ||
-        (opp.opportunity_name && 
-         opp.opportunity_name.toLowerCase().includes(filters.opportunityName.toLowerCase()));
-      
+        (opp.opportunity_name &&
+          opp.opportunity_name.toLowerCase().includes(filters.opportunityName.toLowerCase()));
+
       // Filter by status
-      const matchesStatus = filters.status === 'All Status' || 
+      const matchesStatus = filters.status === 'All Status' ||
         (opp.status && opp.status === filters.status);
-      
+
       // Filter by opportunity type (using opportunity_name as type)
-      const matchesType = filters.type === 'All Leads' || 
+      const matchesType = filters.type === 'All Leads' ||
         (opp.opportunity_name && opp.opportunity_name === filters.type);
-      
-      return matchesSearch && matchesStatus && matchesType;
+
+      // Filter by active table filters (from column headers)
+      const matchesTableFilters = activeTableFilters.every(filter => {
+        if (!filter.values || filter.values.length === 0) return true;
+
+        const value = opp[filter.column];
+        if (!value) return false;
+
+        if (filter.column === 'close_date') {
+          const oppDate = new Date(value).toISOString().split('T')[0];
+          const filterValue = filter.values[0];
+
+          if (filterValue.includes(' to ')) {
+            const [from, to] = filterValue.split(' to ');
+            return oppDate >= from && oppDate <= to;
+          } else {
+            return oppDate === filterValue;
+          }
+        }
+
+        return filter.values.some(v => value.toString().toLowerCase().includes(v.toLowerCase()));
+      });
+
+      return matchesSearch && matchesStatus && matchesType && matchesTableFilters;
     });
   }, [opportunities, filters]);
 
@@ -94,11 +116,11 @@ const Opportunities = () => {
       ['Opportunity ID', 'Opportunity Name', 'Client', 'Status', 'Amount', 'End Date', 'Created By'],
       // Add more sample data if needed
     ];
-    
-    const csvContent = template.map(row => 
+
+    const csvContent = template.map(row =>
       row.map(cell => `"${cell}"`).join(',')
     ).join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     saveAs(blob, 'opportunity_template.csv');
   };
@@ -126,19 +148,19 @@ const Opportunities = () => {
       toast.warning('No data to export!');
       return;
     }
-    
+
     const headers = Object.keys(opportunities[0]);
     const csvContent = [
       headers.join(','),
-      ...opportunities.map(row => 
-        headers.map(fieldName => 
-          JSON.stringify(row[fieldName] || '', (key, value) => 
+      ...opportunities.map(row =>
+        headers.map(fieldName =>
+          JSON.stringify(row[fieldName] || '', (key, value) =>
             value === null ? '' : value
           )
         ).join(',')
       )
     ].join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     saveAs(blob, `opportunities_export_${new Date().toISOString().split('T')[0]}.csv`);
   };
@@ -213,7 +235,7 @@ const Opportunities = () => {
           .map(opp => opp.opportunity_name)
           .filter(Boolean) // Remove any undefined/null values
       )];
-      
+
       // Keep 'All Leads' as first option, then add the unique names
       setOpportunityTypeOptions(['All Leads', ...uniqueOpportunityNames]);
     }
@@ -238,13 +260,13 @@ const Opportunities = () => {
       setShowOnlyDetails(true); // Show only Details tab when editing
       // Fetch the latest opportunity data by ID
       const response = await opportunityService.getOpportunityById(opportunity.id || opportunity.opportunity_id);
-      
+
       console.log('API Response:', response); // Debug log
-      
+
       // The API response has the data in response.data
       const apiData = response.data?.data || opportunity;
       console.log('API Data:', apiData); // Debug log
-      
+
       // Format the data to match the form's expected structure
       const formattedData = {
         opportunity: {
@@ -285,9 +307,9 @@ const Opportunities = () => {
         rfpDocuments: [],
         sowDocuments: []
       };
-      
+
       console.log('Formatted Data for Form:', formattedData); // Debug log
-      
+
       setEditingOpportunity(formattedData);
       setShowForm(true);
     } catch (error) {
@@ -329,14 +351,14 @@ const Opportunities = () => {
     setIsRFPView(false);
     setShowOnlyDetails(false);
     setShowOnlySOW(false);
-    
+
     // Set the appropriate view based on the current stage
     if (currentStage === APPROVAL_STAGES.LEVEL_2_SOW) {
       setShowOnlySOW(true);
     } else {
       setIsRFPView(true);
     }
-    
+
     setEditingOpportunity(opportunity);
     setShowForm(true);
   };
@@ -357,8 +379,8 @@ const Opportunities = () => {
         </span>
       )
     },
-    { 
-      key: 'client_name', 
+    {
+      key: 'client_name',
       header: 'Client',
       headerClassName: 'text-[18px] font-medium',
       render: (value) => (
@@ -368,11 +390,10 @@ const Opportunities = () => {
       )
     },
     {
-      key: 'approval_stage',
-      header: 'Status',
+      key: 'pipeline_status',
+      header: 'Pipeline Status',
       headerClassName: 'text-[18px] font-medium',
       render: (value) => {
-        // Define status colors based on approval stage
         const statusColors = {
           'Draft': 'bg-blue-100 text-blue-800',
           'Pending Approval': 'bg-yellow-100 text-yellow-800',
@@ -381,12 +402,35 @@ const Opportunities = () => {
           'In Review': 'bg-purple-100 text-purple-800',
           'Level 1 Approval - RFB': 'bg-gray-100 text-gray-800'
         };
-        
+
         return (
           <span
-            className={`px-2 py-1 rounded-full text-xs font-medium ${
-              statusColors[value] || 'bg-gray-100 text-gray-800'
-            }`}
+            className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[value] || 'bg-gray-100 text-gray-800'
+              }`}
+          >
+            {value || '-'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'approval_stage',
+      header: 'Status',
+      headerClassName: 'text-[18px] font-medium hidden', // Keep hidden as requested
+      render: (value) => {
+        const statusColors = {
+          'Draft': 'bg-blue-100 text-blue-800',
+          'Pending Approval': 'bg-yellow-100 text-yellow-800',
+          'Approved': 'bg-green-100 text-green-800',
+          'Rejected': 'bg-red-100 text-red-800',
+          'In Review': 'bg-purple-100 text-purple-800',
+          'Level 1 Approval - RFB': 'bg-gray-100 text-gray-800'
+        };
+
+        return (
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[value] || 'bg-gray-100 text-gray-800'
+              }`}
           >
             {value || '-'}
           </span>
@@ -415,7 +459,7 @@ const Opportunities = () => {
       headerClassName: 'text-[18px] font-medium',
       render: (_, row) => {
         const currentStage = row.approval_stage || APPROVAL_STAGES.LEVEL_1_RFB;
-        
+
         if ((currentStage && currentStage.toString().toLowerCase() === 'approved') || (row.status && row.status.toString().toLowerCase() === 'approved')) {
           return (
             <div className="flex items-center space-x-1 text-emerald-600">
@@ -426,14 +470,14 @@ const Opportunities = () => {
         }
 
         const isLevel1 = currentStage === APPROVAL_STAGES.LEVEL_1_RFB;
-        const buttonText = isLevel1 
-          ? 'Level 1 Approval - RFP' 
+        const buttonText = isLevel1
+          ? 'Level 1 Approval - RFP'
           : 'Level 2 Approval - SOW';
-        
-        const buttonClass = isLevel1 
-          ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300' 
+
+        const buttonClass = isLevel1
+          ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300'
           : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200';
-          
+
         return (
           <Button
             variant="outline"
@@ -515,10 +559,10 @@ const Opportunities = () => {
               value={filters.opportunityName === 'All Leads' ? '' : filters.opportunityName}
               onChange={(e) => handleFilterChange('opportunityName', e.target.value)}
             />
-            
+
             {/* Status Filter */}
-            <Select 
-              value={filters.status} 
+            <Select
+              value={filters.status}
               onValueChange={(value) => handleFilterChange('status', value)}
             >
               <SelectTrigger className="w-[130px] h-9 text-sm">
@@ -532,10 +576,10 @@ const Opportunities = () => {
                 ))}
               </SelectContent>
             </Select>
-            
+
             {/* Opportunity Type Filter */}
-            <Select 
-              value={filters.type} 
+            <Select
+              value={filters.type}
               onValueChange={(value) => handleFilterChange('type', value)}
             >
               <SelectTrigger className="w-[150px] h-9 text-sm">
@@ -549,9 +593,9 @@ const Opportunities = () => {
                 ))}
               </SelectContent>
             </Select>
-            
-            <Button 
-              variant="outline" 
+
+            <Button
+              variant="outline"
               className="h-9 text-gray-700 border-gray-300"
               onClick={() => setShowImportModal(true)}
             >
@@ -559,39 +603,39 @@ const Opportunities = () => {
               Import
             </Button>
             <ImportCSVModal
-  isOpen={showImportModal}
-  onClose={() => setShowImportModal(false)}
-  onFileSelect={async (file) => {
-    try {
-      const response = await opportunityService.importOpportunities(file);
-      console.log('Import response:', response);
-      toast.success('Opportunities imported successfully!');
-      fetchOpportunities(); 
-      setShowImportModal(false);
-      return response;
-    } catch (error) {
-      console.error('Import error:', error);
-      const errorMessage = error.response?.data?.message || 
-                         error.message || 
-                         'Failed to import opportunities. Please try again.';
-      toast.error(`Import failed: ${errorMessage}`);
-      throw error;
-    }
-  }}
-  onDownloadTemplate={async () => {
-    try {
-      const templateBlob = await opportunityService.downloadTemplate();
-      return templateBlob;
-    } catch (error) {
-      console.error('Error downloading template:', error);
-      toast.error('Failed to download template. Please try again.');
-      throw error;
-    }
-  }}
-  title="Import Opportunities"
-/>
-            <Button 
-              variant="outline" 
+              isOpen={showImportModal}
+              onClose={() => setShowImportModal(false)}
+              onFileSelect={async (file) => {
+                try {
+                  const response = await opportunityService.importOpportunities(file);
+                  console.log('Import response:', response);
+                  toast.success('Opportunities imported successfully!');
+                  fetchOpportunities();
+                  setShowImportModal(false);
+                  return response;
+                } catch (error) {
+                  console.error('Import error:', error);
+                  const errorMessage = error.response?.data?.message ||
+                    error.message ||
+                    'Failed to import opportunities. Please try again.';
+                  toast.error(`Import failed: ${errorMessage}`);
+                  throw error;
+                }
+              }}
+              onDownloadTemplate={async () => {
+                try {
+                  const templateBlob = await opportunityService.downloadTemplate();
+                  return templateBlob;
+                } catch (error) {
+                  console.error('Error downloading template:', error);
+                  toast.error('Failed to download template. Please try again.');
+                  throw error;
+                }
+              }}
+              title="Import Opportunities"
+            />
+            <Button
+              variant="outline"
               className="h-9 text-gray-700 border-gray-300"
               onClick={handleExportData}
             >
@@ -622,7 +666,7 @@ const Opportunities = () => {
         filterOptions={filterOptions}
         testId="opportunities-table"
       />
- 
+
       <Dialog open={showForm} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -630,16 +674,16 @@ const Opportunities = () => {
               {showOnlySOW ? 'SOW Details' : isRFPView ? 'Opportunity-RFP' : editingOpportunity ? 'Edit Lead' : 'Add New Lead'}
             </DialogTitle>
           </DialogHeader>
-          <OpportunityFormTabbed 
-            opportunity={editingOpportunity} 
-            onClose={handleFormClose} 
+          <OpportunityFormTabbed
+            opportunity={editingOpportunity}
+            onClose={handleFormClose}
             showOnlyRFP={isRFPView}
             showOnlyDetails={showOnlyDetails}
             showOnlySOW={showOnlySOW}
           />
         </DialogContent>
       </Dialog>
- 
+
       <AttachmentPreviewModal
         isOpen={showAttachments}
         onClose={() => setShowAttachments(false)}
@@ -649,5 +693,5 @@ const Opportunities = () => {
     </div>
   );
 };
- 
+
 export default Opportunities;
