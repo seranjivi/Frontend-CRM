@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, Target, DollarSign, FolderOpen, Filter, Calendar, ChevronDown } from 'lucide-react';
-
+//
 const Dashboard = () => {
   // State for filters
   const [filters, setFilters] = useState({
@@ -35,24 +35,24 @@ const Dashboard = () => {
       try {
         const response = await dashboardService.getDashboardStats();
         const { totals, conversionFunnel, sourceDistribution } = response.data;
-        
+
         // Update KPI data
         setKpiData({
-          leads: { 
-            count: totals.opportunities || 0, 
+          leads: {
+            count: totals.opportunities || 0,
             change: 0 // You can calculate this based on previous data if needed
           },
-          opportunities: { 
-            value: totals.value || 0, 
-            count: totals.opportunities || 0, 
+          opportunities: {
+            value: totals.value || 0,
+            count: totals.opportunities || 0,
             change: 0 // You can calculate this based on previous data if needed
           },
-          sales: { 
-            count: totals.won || 0, 
+          sales: {
+            count: totals.won || 0,
             change: 0 // You can calculate this based on previous data if needed
           },
-          projects: { 
-            count: totals.open || 0, 
+          projects: {
+            count: totals.open || 0,
             change: 0 // You can calculate this based on previous data if needed
           }
         });
@@ -173,7 +173,7 @@ const Dashboard = () => {
               <Filter className="h-4 w-4 text-gray-500" />
               <span className="text-sm font-medium">Filters:</span>
             </div>
-            
+
             <div className="flex-1 min-w-[200px]">
               <label className="text-xs font-medium text-gray-500 block mb-1">Time Range</label>
               <Select value={filters.timeRange} onValueChange={(value) => handleFilterChange('timeRange', value)}>
@@ -229,30 +229,30 @@ const Dashboard = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KpiCard 
-          title="Leads" 
-          value={kpiData.leads.count} 
-          change={kpiData.leads.change} 
-          icon={Users} 
+        <KpiCard
+          title="Leads"
+          value={kpiData.leads.count}
+          change={kpiData.leads.change}
+          icon={Users}
         />
-        <KpiCard 
-          title="Opportunities" 
-          value={kpiData.opportunities.value} 
-          change={kpiData.opportunities.change} 
+        <KpiCard
+          title="Opportunities"
+          value={kpiData.opportunities.value}
+          change={kpiData.opportunities.change}
           icon={Target}
-          isCurrency 
+          isCurrency
         />
-        <KpiCard 
-          title="Sales" 
-          value={kpiData.sales.count} 
-          change={kpiData.sales.change} 
-          icon={DollarSign} 
+        <KpiCard
+          title="Sales"
+          value={kpiData.sales.count}
+          change={kpiData.sales.change}
+          icon={DollarSign}
         />
-        <KpiCard 
-          title="Projects" 
-          value={kpiData.projects.count} 
-          change={kpiData.projects.change} 
-          icon={FolderOpen} 
+        <KpiCard
+          title="Projects"
+          value={kpiData.projects.count}
+          change={kpiData.projects.change}
+          icon={FolderOpen}
         />
       </div>
 
@@ -267,17 +267,17 @@ const Dashboard = () => {
               {funnelData.map((stage, index) => {
                 const widthPercentage = (stage.value / funnelData[0].value) * 100;
                 let conversionRate = 0;
-                
+
                 if (index === 0) {
                   conversionRate = 100; // First stage is always 100%
                 } else if (funnelData[index - 1].value > 0) {
                   // Calculate percentage relative to previous stage
                   conversionRate = Math.round((stage.value / funnelData[index - 1].value) * 100);
                 }
-                
+
                 // Ensure we don't show more than 100% conversion
                 conversionRate = Math.min(conversionRate, 100);
-                
+
                 return (
                   <div key={stage.name} className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -291,9 +291,9 @@ const Dashboard = () => {
                         )}
                       </div>
                     </div>
-                    <div 
+                    <div
                       className="h-8 rounded-md transition-all duration-500 ease-in-out"
-                      style={{ 
+                      style={{
                         width: `${widthPercentage}%`,
                         backgroundColor: stage.color,
                         boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
@@ -333,8 +333,8 @@ const Dashboard = () => {
                   layout="horizontal"
                 >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis 
-                    dataKey="name" 
+                  <XAxis
+                    dataKey="name"
                     type="category"
                     tick={{ fontSize: 12 }}
                     angle={-45}
@@ -342,13 +342,13 @@ const Dashboard = () => {
                     height={60}
                     tickLine={false}
                   />
-                  <YAxis 
+                  <YAxis
                     type="number"
                     tick={{ fontSize: 12 }}
                     tickLine={false}
                     axisLine={false}
                   />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value) => value}
                     labelFormatter={(label) => label}
                     content={({ active, payload, label }) => {
@@ -364,7 +364,7 @@ const Dashboard = () => {
                     cursor={{ fill: 'rgba(0, 0, 0, 0.02)' }}
                   />
                   {sourceData.map((entry, index) => (
-                    <Bar 
+                    <Bar
                       key={`bar-${index}`}
                       dataKey="value"
                       name={entry.name}
