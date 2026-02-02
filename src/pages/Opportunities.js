@@ -49,7 +49,7 @@ const Opportunities = () => {
 
   const [activeTableFilters, setActiveTableFilters] = useState([]);
 
-  const statusOptions = ['All Status', 'Active', 'Inactive', 'Won', 'Lost', 'In Progress'];
+  const statusOptions = ['All Status', 'Proposal Work-in-Progress', 'Proposal Review', 'Price Negotiation', 'Won', 'Lost'];
   const [opportunityTypeOptions, setOpportunityTypeOptions] = useState(['All Leads']);
 
   // Handle filter changes
@@ -71,7 +71,7 @@ const Opportunities = () => {
 
       // Filter by status
       const matchesStatus = filters.status === 'All Status' ||
-        (opp.status && opp.status === filters.status);
+        (opp.pipeline_status && opp.pipeline_status === filters.status);
 
       // Filter by opportunity type (using opportunity_name as type)
       const matchesType = filters.type === 'All Leads' ||
@@ -376,21 +376,20 @@ const Opportunities = () => {
       )
     },
     {
-      key: 'approval_stage',
+      key: 'pipeline_status',
       header: 'Status',
       headerClassName: 'text-[18px] font-medium',
       sortable: true,
       filterable: true,
       filterType: 'select',
       render: (value) => {
-        // Define status colors based on approval stage
+        // Define status colors based on pipeline status
         const statusColors = {
-          'Draft': 'bg-blue-100 text-blue-800',
-          'Pending Approval': 'bg-yellow-100 text-yellow-800',
-          'Approved': 'bg-green-100 text-green-800',
-          'Rejected': 'bg-red-100 text-red-800',
-          'In Review': 'bg-purple-100 text-purple-800',
-          'Level 1 Approval - RFB': 'bg-gray-100 text-gray-800'
+          'Proposal Work-in-Progress': 'bg-blue-100 text-blue-800',
+          'Proposal Review': 'bg-purple-100 text-purple-800',
+          'Price Negotiation': 'bg-yellow-100 text-yellow-800',
+          'Won': 'bg-green-100 text-green-800',
+          'Lost': 'bg-red-100 text-red-800'
         };
 
         return (
