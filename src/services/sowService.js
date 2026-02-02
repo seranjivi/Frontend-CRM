@@ -71,7 +71,7 @@ const sowService = {
   // Get SOW by ID
   getSOW: async (id) => {
     try {
-      const response = await api.get(`/sows/${id}`);
+      const response = await api.get(`/api/sows/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching SOW ${id}:`, error);
@@ -93,7 +93,7 @@ const sowService = {
   // Delete SOW
   deleteSOW: async (id) => {
     try {
-      await api.delete(`/sows/${id}`);
+      await api.delete(`/api/sows/${id}`);
     } catch (error) {
       console.error(`Error deleting SOW ${id}:`, error);
       throw error;

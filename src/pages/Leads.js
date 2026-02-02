@@ -98,6 +98,7 @@ const Leads = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const content = e.target.result;
+        console.log('File content:', content);
         // Here you would typically parse the CSV and call an API
         toast.success(`File "${file.name}" imported successfully!`);
       };

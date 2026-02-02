@@ -29,7 +29,15 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
+      console.log('=== LOGIN ATTEMPT ===');
+      console.log('Email:', email);
+      console.log('Password:', password ? '[REDACTED]' : '[EMPTY]');
+      
       const response = await api.post('/auth/login', { email, password });
+      console.log('=== API RESPONSE ===');
+      console.log('Status:', response.status);
+      console.log('Data:', response.data);
+      
       // Handle the nested response structure
       const { data } = response.data;
       const { token, user } = data || {};
@@ -38,11 +46,16 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Invalid response from server: Missing token or user data');
       }
       
+      console.log('=== EXTRACTED DATA ===');
+      console.log('Token:', token ? '[RECEIVED]' : '[MISSING]');
+      console.log('User:', user);
+      
       // Save token and user data
       setAuthToken(token);
       setAuthUser(user);
       setUser(user);
       
+      console.log('=== LOGIN SUCCESS ===');
       return { token, user };
     } catch (error) {
       console.error('=== LOGIN ERROR ===');

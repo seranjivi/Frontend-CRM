@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useInView } from 'react-intersection-observer';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Download, X, Search, Upload } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import ClientForm from '../components/ClientForm';
@@ -10,48 +9,34 @@ import { Button } from '../components/ui/button';
 import ImportCSVModal from '../components/ImportCSVModal';
 import clientService from '../services/clientService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Input } from '../components/ui/input';
 
 const Clients = () => {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadingClientDetails, setLoadingClientDetails] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
   const [viewingClient, setViewingClient] = useState(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isViewMode, setIsViewMode] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [visibleCount, setVisibleCount] = useState(10);
-  const [loadMoreRef, inView] = useInView({
-    threshold: 0.1,
-    triggerOnce: false
-  });
   const [filters, setFilters] = useState({
     region: '',
-    status: '',
+    client_status: '',
     client_tier: '',
-    account_owner: '',
     date_range: 'all',
-    search: ''
+    search: '',
+    client_name: ''
   });
   const fileInputRef = useRef(null);
 
   // Get unique values for filters
-  // Get unique account owners
-  const accountOwners = [...new Set(
-    clients
-      .map(client => client.account_owner || client.account_owner_id || client.user_id || '')
-      .filter(Boolean)
-  )].sort();
-
   const filterOptions = {
     region: [...new Set(clients.map(client => client.region).filter(Boolean))],
-    status: ['All Status', 'Active', 'Inactive'],
-    client_tier: ['A', 'B', 'C', 'D'],
-    account_owners: ['All Owners', ...accountOwners]
+    client_status: ['Active', 'Inactive', 'Prospect'],
+    client_tier: ['A', 'B', 'C', 'D']
   };
+
+  const statusOptions = ['All Status', 'Active', 'Inactive'];
 
   // Filter clients based on all active filters
   const filteredClients = clients.filter(client => {
@@ -83,35 +68,27 @@ const Clients = () => {
         dateInRange = true;
     }
 
-    // Search across multiple fields (case-insensitive)
+    // Client name filter (case-insensitive search)
     const matchesSearch = !filters.search || 
-      (client.client_name && client.client_name.toLowerCase().includes(filters.search.toLowerCase())) ||
-      (client.client_id && client.client_id.toString().toLowerCase().includes(filters.search.toLowerCase())) ||
-      (client.industry && client.industry.toLowerCase().includes(filters.search.toLowerCase())) ||
-      (client.customer_type && client.customer_type.toLowerCase().includes(filters.search.toLowerCase()));
+      (client.client_name && client.client_name.toLowerCase().includes(filters.search.toLowerCase()));
 
-    // Status filter (case-insensitive and flexible with status values)
-    const clientStatus = String(client.status || client.client_status || '').toLowerCase();
-    const matchesStatus = !filters.status || 
-      filters.status === '' ||
-      filters.status === 'All Status' ||
-      (filters.status === 'Active' && clientStatus !== 'inactive') ||
-      (filters.status === 'Inactive' && clientStatus === 'inactive');
+    // Client name dropdown filter (exact match)
+    const matchesClientName = !filters.client_name || 
+      (client.client_name && client.client_name === filters.client_name);
 
-    // Check account owner filter
-    const matchesAccountOwner = !filters.account_owner || 
-      filters.account_owner === '' ||
-      filters.account_owner === 'All Owners' ||
-      client.account_owner === filters.account_owner ||
-      client.account_owner_id === filters.account_owner ||
-      client.user_id === filters.account_owner;
+    // Status filter
+    const matchesStatus = !filters.client_status || 
+      filters.client_status === '' ||
+      filters.client_status === 'All Status' ||
+      (filters.client_status === 'Active' && client.client_status === 'Active') ||
+      (filters.client_status === 'Inactive' && (!client.client_status || client.client_status === 'Inactive'));
 
     return (
       matchesSearch &&
+      matchesClientName &&
       (filters.region === '' || client.region === filters.region) &&
       matchesStatus &&
       (filters.client_tier === '' || client.client_tier === filters.client_tier) &&
-      (filters.account_owner === '' || matchesAccountOwner) &&
       dateInRange
     );
   });
@@ -126,45 +103,15 @@ const Clients = () => {
   const clearFilters = () => {
     setFilters({
       region: '',
-      status: '',
+      client_status: '',
       client_tier: '',
-      account_owner: '',
-      date_range: 'all',
-      search: ''
+      date_range: 'all'
     });
   };
 
   useEffect(() => {
     fetchClients();
   }, []);
-
-  useEffect(() => {
-    if (clients.length > 0) {
-      const names = [...new Set(clients.map(c => c.client_name).filter(Boolean))];
-      // setClientNames(names);
-    }
-  }, [clients]);
-
-  // Load more items when scrolled to bottom
-  useEffect(() => {
-    if (inView) {
-      setVisibleCount(prev => prev + 10);
-    }
-  }, [inView]);
-
-  // Reset visible count when search query changes
-  useEffect(() => {
-    setVisibleCount(10);
-  }, [searchQuery]);
-
-  // Filter clients based on search query
-  const filteredClientNames = useMemo(() => {
-    return []
-      .filter(name => 
-        name.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-      .slice(0, visibleCount);
-  }, [searchQuery, visibleCount]);
 
   const fetchClients = async () => {
     try {
@@ -200,17 +147,20 @@ const Clients = () => {
       e.stopPropagation();
     }
     
-    if (loadingClientDetails) return; // Prevent multiple clicks
-    
     try {
-      setLoadingClientDetails(true); // Start loading
+      console.log('Client object (view):', client);
       const clientId = client.id || client._id || client.client_id;
       if (!clientId) {
         throw new Error('Client ID not found');
       }
-      const response = await clientService.getClientById(clientId);      
+      console.log('Using client ID (view):', clientId);
+      const response = await clientService.getClientById(clientId);
+      console.log('API Response (view):', response);
+      
       if (response) {
-        const clientData = response.data || response;        
+        const clientData = response.data || response;
+        console.log('Client data (view):', clientData);
+        
         const formData = {
           id: clientData.id || clientData._id || clientData.client_id,
           client_name: clientData.client_name || '',
@@ -221,7 +171,7 @@ const Clients = () => {
           gst_tax_id: clientData.gst_tax_id || clientData.tax_id || '',
           client_status: clientData.status === 'active' || clientData.client_status === 'Active' ? 'Active' : 'Inactive',
           notes: clientData.notes || '',
-          account_owner: clientData.account_owner_id || clientData.account_owner || clientData.user_id || '',
+          account_owner: clientData.account_owner || clientData.user_id || '',
           addresses: clientData.addresses && clientData.addresses.length > 0 
             ? clientData.addresses.map(addr => ({
                 address_line1: addr.address_line1 || '',
@@ -238,7 +188,7 @@ const Clients = () => {
                 name: contact.name || '',
                 email: contact.email || '',
                 phone: contact.phone || '',
-                designation: contact.designation || contact.position || '',
+                position: contact.position || '',
                 is_primary: contact.is_primary || false
               }))
             : [{ name: '', email: '', phone: '', position: '', is_primary: false }]
@@ -251,8 +201,6 @@ const Clients = () => {
     } catch (error) {
       console.error('Error fetching client details (view):', error);
       toast.error('Failed to load client details');
-    } finally {
-      setLoadingClientDetails(false); // Stop loading in all cases
     }
   };
 
@@ -261,17 +209,20 @@ const Clients = () => {
       e.stopPropagation();
     }
     
-    if (loadingClientDetails) return; // Prevent multiple clicks
-    
     try {
-      setLoadingClientDetails(true); // Start loading
+      console.log('Client object (edit):', client);
       const clientId = client.id || client._id || client.client_id;
       if (!clientId) {
         throw new Error('Client ID not found');
       }
-      const response = await clientService.getClientById(clientId);      
+      console.log('Using client ID (edit):', clientId);
+      const response = await clientService.getClientById(clientId);
+      console.log('API Response (edit):', response);
+      
       if (response) {
         const clientData = response.data || response;
+        console.log('Client data (edit):', clientData);
+        
         const formData = {
           id: clientData.id || clientData._id || clientData.client_id,
           client_name: clientData.client_name || '',
@@ -282,7 +233,7 @@ const Clients = () => {
           gst_tax_id: clientData.gst_tax_id || clientData.tax_id || '',
           client_status: clientData.status === 'active' || clientData.client_status === 'Active' ? 'Active' : 'Inactive',
           notes: clientData.notes || '',
-          account_owner: clientData.account_owner_id || clientData.account_owner || clientData.user_id || '',
+          account_owner: clientData.account_owner || clientData.user_id || '',
           addresses: clientData.addresses && clientData.addresses.length > 0 
             ? clientData.addresses.map(addr => ({
                 address_line1: addr.address_line1 || '',
@@ -299,7 +250,7 @@ const Clients = () => {
                 name: contact.name || '',
                 email: contact.email || '',
                 phone: contact.phone || '',
-                designation: contact.designation || contact.position || '',
+                position: contact.position || '',
                 is_primary: contact.is_primary || false
               }))
             : [{ name: '', email: '', phone: '', position: '', is_primary: false }]
@@ -312,8 +263,6 @@ const Clients = () => {
     } catch (error) {
       console.error('Error fetching client details (edit):', error);
       toast.error('Failed to load client details');
-    } finally {
-      setLoadingClientDetails(false); // Stop loading in all cases
     }
   };
 
@@ -454,17 +403,10 @@ const Clients = () => {
     {
       key: 'client_code',
       header: 'Client ID',
-      render: (value, row) => (
-        <button 
-          onClick={(e) => {
-            if (loadingClientDetails) return; // Prevent multiple clicks
-            e.stopPropagation();
-            handleView(row, e);
-          }}
-          className="text-blue-600 hover:underline cursor-pointer text-left"
-        >
+      render: (value) => (
+        <span className="text-blue-600">
           {value}
-        </button>
+        </span>
       ),
     },
     {
@@ -525,22 +467,10 @@ const Clients = () => {
       render: (value) => <span className="text-sm text-slate-700">{formatDate(value)}</span>
     },
   ];
+ 
   const handleFileSelect = (file) => {
     setSelectedFile(file);
   };
-
-  // Full page loader for initial list loading
-  if (loading && clients.length === 0) {
-    return (
-      <div className="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-700 text-lg font-medium">Loading clients...</p>
-          <p className="text-sm text-gray-500 mt-1">Please wait while we fetch your client data</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto py-6 px-4">
@@ -567,13 +497,29 @@ const Clients = () => {
                 value={filters.search || ''}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
               />
-              {/* {filters.search && (
-                // <X
-                //   className="absolute right-2.5 h-4 w-4 text-muted-foreground cursor-pointer"
-                //   onClick={() => handleFilterChange('search', '')}
-                // />
-              )} */}
+              {filters.search && (
+                <X
+                  className="absolute right-2.5 h-4 w-4 text-muted-foreground cursor-pointer"
+                  onClick={() => handleFilterChange('search', '')}
+                />
+              )}
             </div>
+            <Select 
+              value={filters.client_name || ''}
+              onValueChange={(value) => handleFilterChange('client_name', value === 'All Clients' ? '' : value)}
+            >
+              <SelectTrigger className="w-[150px] h-9 text-sm">
+                <SelectValue placeholder="Client Name" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All Clients">All Clients</SelectItem>
+                {Array.from(new Set(clients.map(c => c.client_name).filter(Boolean))).map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select 
               value={filters.status} 
               onValueChange={(value) => handleFilterChange('status', value)}
@@ -582,25 +528,9 @@ const Clients = () => {
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
-                {filterOptions.status.map((status) => (
+                {statusOptions.map((status) => (
                   <SelectItem key={status} value={status}>
                     {status}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select 
-              value={filters.account_owner} 
-              onValueChange={(value) => handleFilterChange('account_owner', value)}
-            >
-              <SelectTrigger className="w-[150px] h-9 text-sm">
-                <SelectValue placeholder="All Owners" />
-              </SelectTrigger>
-              <SelectContent>
-                {filterOptions.account_owners.map((owner) => (
-                  <SelectItem key={owner} value={owner}>
-                    {owner}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -636,8 +566,6 @@ const Clients = () => {
             <Button
               onClick={() => {
                 setEditingClient(null);
-                setViewingClient(null);
-                setIsViewMode(false);
                 setShowForm(true);
               }}
               className="h-9 text-xs sm:text-sm whitespace-nowrap bg-[#0A2A43] hover:bg-[#0A2A43]/90"
@@ -658,25 +586,14 @@ const Clients = () => {
           testId="clients-table"
           loading={loading}
           hideAddButton={true}
-          viewButtonClass={`h-8 w-8 p-0 ${loadingClientDetails ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:text-gray-800'}`}
-          editButtonClass={`h-8 w-8 p-0 ${loadingClientDetails ? 'text-blue-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-800'}`}
-          deleteButtonClass={`h-8 w-8 p-0 ${loadingClientDetails ? 'text-red-400 cursor-not-allowed' : 'text-red-600 hover:text-red-800'}`}
-          disableActions={loadingClientDetails}
+          viewButtonClass="h-8 w-8 p-0 text-gray-600 hover:text-gray-800"
+          editButtonClass="h-8 w-8 p-0 text-blue-600 hover:text-blue-800"
+          deleteButtonClass="h-8 w-8 p-0 text-red-600 hover:text-red-800"
         />
       </div>
-
-      {/* Full-page loading overlay */}
-      {loadingClientDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-            <p className="text-gray-700">Loading client details...</p>
-          </div>
-        </div>
-      )}
-
+ 
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0" hideCloseButton={true}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
           <ClientForm
             client={isViewMode ? viewingClient : editingClient}
             viewMode={isViewMode}

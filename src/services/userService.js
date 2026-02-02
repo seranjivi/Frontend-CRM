@@ -16,36 +16,10 @@ export const getUsers = async () => {
 export const getUserById = async (userId) => {
   try {
     const response = await api.get(`/users/${userId}`);
-    const userData = response.data;
-    
-    // Ensure we have a proper response structure
-    if (!userData) {
-      throw new Error('No user data received from server');
-    }
-
-    // Log the raw response for debugging
-
-    // Return the user data in a consistent format
-    return {
-      ...userData,
-      // Ensure these fields exist with defaults if not present
-      id: userData.id || userId,
-      full_name: userData.full_name || userData.name || '',
-      email: userData.email || '',
-      role: userData.role || (userData.roles && userData.roles[0]?.id) || '',
-      role_id: userData.role_id || (userData.roles && userData.roles[0]?.id) || '',
-      role_name: userData.role_name || (userData.roles && userData.roles[0]?.name) || '',
-      status: (userData.status || 'active').toLowerCase(),
-      regions: userData.regions || userData.assigned_regions || [],
-      assigned_regions: userData.assigned_regions || userData.regions || []
-    };
+    return response.data;
   } catch (error) {
     console.error(`Error fetching user with ID ${userId}:`, error);
-    // Enhance the error with more context
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch user';
-    const enhancedError = new Error(errorMessage);
-    enhancedError.status = error.response?.status;
-    throw enhancedError;
+    throw error;
   }
 };
 

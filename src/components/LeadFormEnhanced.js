@@ -324,6 +324,7 @@ const LeadFormEnhanced = ({ lead, onClose }) => {
       } else {
         // Create new lead
         response = await api.post('/leads', submissionData);
+        console.log('Create lead response:', response.data); // Debug log
         // Handle different response formats
         if ((response.data && response.data.success) || response.data.id) {
           toast.success('Lead created successfully');

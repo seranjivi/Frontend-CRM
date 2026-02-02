@@ -25,7 +25,9 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const response = await login(email, password);      
+      const response = await login(email, password);
+      console.log('Login response:', response); // Debug log
+      
       if (response) {
         toast.success('Login successful!');
         // Use setTimeout to ensure the toast is visible before navigation
