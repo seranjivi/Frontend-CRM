@@ -21,7 +21,6 @@ const AttachmentPreviewModal = ({ isOpen, onClose, attachments, entityName }) =>
 
   const handleDownload = (attachment) => {
     // For now, show toast. In production, implement actual download
-    console.log('Download:', attachment);
     // TODO: Implement actual file download from backend
   };
 

@@ -134,16 +134,12 @@ class MasterDataService {
 
   // Get countries by region ID
   async getCountriesByRegionId(regionId) {
-    console.log('getCountriesByRegionId called with regionId:', regionId);
     if (!regionId) {
-      console.log('No regionId provided, returning empty array');
       return [];
     }
     
     try {
-      console.log('Making API call to /countries/by-region/' + regionId);
       const response = await api.get(`/countries/by-region/${regionId}`);
-      console.log('API response:', response.data);
       return response.data || [];
     } catch (error) {
       console.error(`Error fetching countries for region ${regionId}:`, error);
@@ -226,15 +222,11 @@ class MasterDataService {
   // Get regions by country ID
  async getRegionsByCountryId(countryId) {
   if (!countryId) {
-    console.log('No country ID provided to getRegionsByCountryId');
     return [];
   }
   
   try {
-    console.log(`Fetching regions for country ID: ${countryId}`);
-    const response = await api.get(`/regions/country/${countryId}`);
-    console.log('Regions API Response:', response);
-    
+    const response = await api.get(`/regions/country/${countryId}`);    
     if (!response.data) {
       console.warn('No data in regions API response');
       return [];
@@ -246,10 +238,7 @@ class MasterDataService {
       regions = response.data;
     } else if (response.data.data && Array.isArray(response.data.data)) {
       regions = response.data.data;
-    }
-    
-    console.log(`Found ${regions.length} regions for country ${countryId}`);
-    
+    }    
     // Map the response to the expected format
     return regions.map(region => ({
       id: region.id || region.region_id || '',

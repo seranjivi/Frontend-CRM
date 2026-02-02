@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
-import { Plus, Search, Download, Upload, FileText, Eye, Edit2, MoreHorizontal } from 'lucide-react';
+import { Plus, Search, Download, Upload, FileText, Eye, Edit, MoreHorizontal, Trash2 } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
@@ -10,6 +10,7 @@ import { Dialog, DialogContent } from '../components/ui/dialog';
 import { Badge } from '../components/ui/badge';
 import DataTable from '../components/DataTable';
 import sowService from '../services/sowService';
+import SOWViewDialog from '../components/SOWViewDialog';
 
 const SOWs = () => {
   const navigate = useNavigate();
@@ -17,6 +18,9 @@ const SOWs = () => {
   const [loading, setLoading] = useState(false); 
   const [showForm, setShowForm] = useState(false);
   const [editingSOW, setEditingSOW] = useState(null);
+  const [viewingSOW, setViewingSOW] = useState(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [filters, setFilters] = useState({
     status: 'All Status',
     client: 'All Clients'
@@ -121,13 +125,123 @@ const SOWs = () => {
     setShowForm(true);
   };
 
-  const handleViewSOW = (sow) => {
-    navigate(`/sow/${sow.id}`);
+  const handleViewSOW = async (sow) => {
+    try {
+      setLoading(true);
+      // Fetch the full SOW details using the numeric ID
+      const numericId = sow.id.replace('SOW-', '');
+      const fullSOW = await sowService.getSOW(numericId);
+      setViewingSOW({
+        ...sow,
+        ...fullSOW, // This will merge any additional fields from the API
+        // Map any necessary fields that might be named differently in the API
+        sow_id: fullSOW.sow_id,
+        sow_title: fullSOW.sow_title,
+        sow_status: fullSOW.sow_status,
+        client_name: fullSOW.client_name,
+        target_kickoff_date: fullSOW.target_kickoff_date,
+        contract_value: fullSOW.contract_value,
+        contract_currency: fullSOW.contract_currency
+      });
+      setIsEditMode(false);
+      setIsViewDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching SOW details:', error);
+      toast.error('Failed to load SOW details');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEditSOW = (sow) => {
-    setEditingSOW(sow);
-    setShowForm(true);
+  const handleCloseViewDialog = () => {
+    setIsViewDialogOpen(false);
+    setViewingSOW(null);
+  };
+
+  const handleEditSOW = async (sow) => {
+    try {
+      setLoading(true);
+      // Fetch the latest SOW data
+      const numericId = sow.id.replace('SOW-', '');
+      const fullSOW = await sowService.getSOW(numericId);
+      setViewingSOW({
+        ...sow,
+        ...fullSOW,
+        sow_id: fullSOW.sow_id,
+        sow_title: fullSOW.sow_title,
+        sow_status: fullSOW.sow_status,
+        client_name: fullSOW.client_name,
+        target_kickoff_date: fullSOW.target_kickoff_date,
+        contract_value: fullSOW.contract_value,
+        contract_currency: fullSOW.contract_currency
+      });
+      setIsEditMode(true);
+      setIsViewDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching SOW details:', error);
+      toast.error('Failed to load SOW details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateSOW = async () => {
+    if (!viewingSOW) return;
+    
+    try {
+      setLoading(true);
+      
+      // Extract numeric ID from viewingSOW.id (format: 'SOW-123') or use sow_id directly
+      const numericId = viewingSOW.id ? viewingSOW.id.replace('SOW-', '') : viewingSOW.sow_id;
+      
+      if (!numericId) {
+        throw new Error('Invalid SOW ID');
+      }
+      
+      // Prepare the data to be sent to the API
+      const updateData = {
+        sow_id: numericId,
+        sow_title: viewingSOW.sow_title,
+        sow_status: viewingSOW.sow_status,
+        client_name: viewingSOW.client_name,
+        target_kickoff_date: viewingSOW.target_kickoff_date,
+        contract_value: viewingSOW.contract_value,
+        contract_currency: viewingSOW.contract_currency,
+        scope_overview: viewingSOW.scope_overview,
+        // Add any other fields that need to be updated
+      };
+      
+      // Call the update API with the numeric ID
+      await sowService.updateSOW(numericId, updateData);
+      
+      toast.success('SOW updated successfully');
+      setIsEditMode(false);
+      
+      // Refresh the SOWs list
+      const response = await sowService.getSOWs();
+      const formattedSOWs = response.data.map(sow => ({
+        id: `SOW-${sow.sow_id}`,
+        title: sow.sow_title,
+        client: sow.client_name || '-',
+        status: sow.sow_status,
+        targetKickoffDate: sow.target_kickoff_date,
+        value: parseFloat(sow.contract_value) || 0,
+        currency: sow.contract_currency,
+        ...sow
+      }));
+      setSOWs(formattedSOWs);
+      setFilteredSOWs(formattedSOWs);
+    } catch (error) {
+      console.error('Error updating SOW:', error);
+      toast.error('Failed to update SOW');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setIsViewDialogOpen(false);
   };
 
   const handleFormSubmit = async (sowData) => {
@@ -153,17 +267,18 @@ const SOWs = () => {
 
   const handleImportSOW = () => {
     // Handle import SOW
-    console.log('Import SOW');
   };
 
-  const handleDelete = async (sow) => {
+  const handleDeleteSOW = async (sow) => {
     if (window.confirm(`Are you sure you want to delete ${sow.title}?`)) {
       try {
         setLoading(true);
-        // TODO: Replace with actual API call
-        // await sowService.deleteSOW(sow.id);
-        // Refresh the SOWs list
-        // fetchSOWs();
+        const numericId = sow.id.replace('SOW-', '');
+        await sowService.deleteSOW(numericId);
+        // Update local state instead of refetching
+        setSOWs(prev => prev.filter(s => s.id !== sow.id));
+        setFilteredSOWs(prev => prev.filter(s => s.id !== sow.id));
+        setIsViewDialogOpen(false);
         toast.success('SOW deleted successfully');
       } catch (error) {
         console.error('Error deleting SOW:', error);
@@ -179,7 +294,12 @@ const SOWs = () => {
       key: 'title',
       header: 'SOW Title',
       render: (_, row) => (
-        <div className="font-medium text-gray-900">{row.title}</div>
+        <div 
+          className="font-medium text-blue-600 hover:underline cursor-pointer"
+          onClick={() => handleViewSOW(row)}
+        >
+          {row.title}
+        </div>
       ),
     },
     { key: 'client', header: 'Client' },
@@ -201,6 +321,44 @@ const SOWs = () => {
       className: 'text-right',
     },
   ];
+
+  const customActions = (row) => (
+    <div className="flex items-center space-x-1">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => handleViewSOW(row)}
+        className="h-8 w-8 p-0 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+        title="View SOW"
+      >
+        <Eye className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={async (e) => {
+          e.stopPropagation();
+          await handleEditSOW(row);
+        }}
+        className="h-8 w-8 p-0 hover:bg-gray-100 text-blue-600 hover:text-blue-700"
+        title="Edit SOW"
+      >
+        <Edit className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleDeleteSOW(row);
+        }}
+        className="h-8 w-8 p-0 hover:bg-gray-100 text-red-600 hover:text-red-700"
+        title="Delete SOW"
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -256,9 +414,7 @@ const SOWs = () => {
       <DataTable
         data={filteredSOWs}
         columns={columns}
-        onView={handleViewSOW}
-        onEdit={handleEditSOW}
-        onDelete={handleDelete}
+        customActions={customActions}
         onExport={() => {
           // Handle export logic here
           toast.success('Exporting SOWs...');
@@ -313,6 +469,18 @@ const SOWs = () => {
           />
         </DialogContent>
       </Dialog>
+
+      {/* SOW View Dialog */}
+      <SOWViewDialog
+        open={isViewDialogOpen}
+        onClose={handleCloseViewDialog}
+        sowData={viewingSOW}
+        isEditMode={isEditMode}
+        onEdit={() => handleEditSOW(viewingSOW)}
+        onDelete={() => handleDeleteSOW(viewingSOW)}
+        onUpdate={handleUpdateSOW}
+        onCancelEdit={handleCancelEdit}
+      />
     </div>
   );
 };

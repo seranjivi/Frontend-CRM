@@ -23,15 +23,25 @@ const UserManagement = () => {
 
 const fetchUsers = async () => {
   try {
+    setLoading(true);
     const response = await userService.getUsers();
-    // Ensure we're working with an array
-    const usersData = Array.isArray(response) ? response : 
-                     (response?.data ? response.data : []);
-    setUsers(usersData);
+    const allUsers = Array.isArray(response?.data) ? response.data : [];
+    
+    // Map users and ensure role information is properly set
+    const usersWithRoles = allUsers.map(user => ({
+      ...user,
+      // Ensure role is properly set for display
+      role: user.role_name || 
+            (user.roles && user.roles[0]?.name) || 
+            user.role ||
+            'No Role Assigned'
+    }));
+
+    setUsers(usersWithRoles);
   } catch (error) {
     console.error('Error fetching users:', error);
-    toast.error('Failed to fetch users');
-    setUsers([]); // Ensure we set an empty array on error
+    toast.error('Failed to load users');
+    setUsers([]);
   } finally {
     setLoading(false);
   }
@@ -50,34 +60,39 @@ const fetchUsers = async () => {
   }
 };
 
-  const handleEdit = async (user) => {
-    try {
-      console.log('Starting to edit user:', user);
-      const response = await userService.getUserById(user.id);
-      const userData = response.data;  // Extract data from response
-      console.log('Raw user data from API:', userData);
-      
-      // Transform the data to match the expected format
-      const formattedUser = {
-        ...userData,
-        full_name: userData.full_name || userData.name || '',
-        email: userData.email || '',
-        role: userData.role_id || userData.role?.id || '',
-        role_id: userData.role_id || userData.role?.id || '',
-        role_name: userData.role_name || userData.role?.name || '',
-        status: (userData.status || 'active').toLowerCase(),
-        regions: userData.regions || userData.assigned_regions || [],
-        id: userData.id || user.id
-      };
-      
-      console.log('Formatted user data for edit:', formattedUser);
-      setEditingUser(formattedUser);
-      setShowForm(true);
-    } catch (error) {
-      console.error('Error fetching user details:', error);
-      toast.error('Failed to fetch user details');
-    }
-  };
+const handleEdit = async (user) => {
+  try {
+    const response = await userService.getUserById(user.id);
+    const userData = response.data;
+
+    // Get role names from the API response
+    const roleNames = userData.roles || [];
+    
+    // Format roles as objects with id and name for the form
+    const roles = roleNames.map(roleName => ({
+      id: roleName,  // Use the role name as ID if no ID is available
+      name: roleName
+    }));
+
+    const formattedUser = {
+      ...userData,
+      full_name: userData.full_name || '',
+      email: userData.email || '',
+      // Format expected by UserForm
+      roles: roles.map(role => role.id),  // Array of role IDs
+      roleNames: roles.map(role => role.name),  // Array of role names
+      status: (userData.status || 'active').toLowerCase(),
+      assigned_regions: userData.regions || [],
+      id: userData.id || user.id
+    };
+    
+    setEditingUser(formattedUser);
+    setShowForm(true);
+  } catch (error) {
+    console.error('Error fetching user details:', error);
+    toast.error(`Failed to fetch user details: ${error.message || 'Unknown error'}`);
+  }
+};
 
   const handleFormClose = () => {
     setShowForm(false);
@@ -99,18 +114,25 @@ const fetchUsers = async () => {
   const columns = [
     { key: 'full_name', header: 'Full Name' },
     { key: 'email', header: 'Email Address' },
-    {
-      key: 'role', 
-      header: 'Access Role',
-      render: (value) => (
-        <span className="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-700">
-          {value}
-        </span>
-      ),
-    },
+   {
+  key: 'role', 
+  header: 'Access Role',
+  render: (value, row) => {
+    // Get the roles array from the row
+    const roles = row.roles || [];
+    // Join the roles array with comma and space, or show 'No Role Assigned' if empty
+    const roleText = roles.length > 0 ? roles.join(', ') : 'No Role Assigned';
+    
+    return (
+      <span className="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
+        {roleText}
+      </span>
+    );
+  },
+},
     {
       key: 'assigned_regions',
-      header: 'Assigned Regionss',
+      header: 'Assigned Regions',
       render: (value) => (
         <div className="flex flex-wrap gap-1">
           {value && value.length > 0 ? (

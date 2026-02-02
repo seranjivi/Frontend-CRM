@@ -4,7 +4,52 @@ import { Check, ChevronDown, ChevronUp } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-const Select = SelectPrimitive.Root
+// Add error boundary to prevent crashes
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Error in Select component:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || <div>Something went wrong with the select component.</div>;
+    }
+    return this.props.children;
+  }
+}
+
+const Select = React.forwardRef((props, ref) => {
+  const [isMounted, setIsMounted] = React.useState(false);
+  
+  React.useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
+
+  return (
+    <ErrorBoundary>
+      <SelectPrimitive.Root 
+        {...props} 
+        onOpenChange={(open) => {
+          if (!isMounted) return;
+          props.onOpenChange?.(open);
+        }}
+        ref={ref}
+      />
+    </ErrorBoundary>
+  );
+});
+
+Select.displayName = 'Select';
 
 const SelectGroup = SelectPrimitive.Group
 
