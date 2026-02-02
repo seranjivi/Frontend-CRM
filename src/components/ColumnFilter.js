@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Filter, X } from 'lucide-react';
 import masterDataService from '../services/masterDataService';
 import DateFilter from './DateFilter';
-
+//
 const ColumnFilter = ({ column, data, onFilterChange, activeFilters = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
