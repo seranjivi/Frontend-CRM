@@ -45,7 +45,7 @@ const Opportunities = () => {
     type: 'All Leads'
   });
 
-  const statusOptions = ['All Status', 'Active', 'Inactive', 'Won', 'Lost', 'In Progress'];
+  const statusOptions = ['All Status', 'Proposal Work-in-Progress', 'Proposal Review', 'Price Negotiation', 'Won', 'Lost'];
   const [opportunityTypeOptions, setOpportunityTypeOptions] = useState(['All Leads']);
 
   // Handle filter changes
@@ -67,35 +67,13 @@ const Opportunities = () => {
 
       // Filter by status
       const matchesStatus = filters.status === 'All Status' ||
-        (opp.status && opp.status === filters.status);
+        (opp.pipeline_status && opp.pipeline_status === filters.status);
 
       // Filter by opportunity type (using opportunity_name as type)
       const matchesType = filters.type === 'All Leads' ||
         (opp.opportunity_name && opp.opportunity_name === filters.type);
 
-      // Filter by active table filters (from column headers)
-      const matchesTableFilters = activeTableFilters.every(filter => {
-        if (!filter.values || filter.values.length === 0) return true;
-
-        const value = opp[filter.column];
-        if (!value) return false;
-
-        if (filter.column === 'close_date') {
-          const oppDate = new Date(value).toISOString().split('T')[0];
-          const filterValue = filter.values[0];
-
-          if (filterValue.includes(' to ')) {
-            const [from, to] = filterValue.split(' to ');
-            return oppDate >= from && oppDate <= to;
-          } else {
-            return oppDate === filterValue;
-          }
-        }
-
-        return filter.values.some(v => value.toString().toLowerCase().includes(v.toLowerCase()));
-      });
-
-      return matchesSearch && matchesStatus && matchesType && matchesTableFilters;
+      return matchesSearch && matchesStatus && matchesType;
     });
   }, [opportunities, filters]);
 
@@ -360,14 +338,16 @@ const Opportunities = () => {
       key: 'pipeline_status',
       header: 'Pipeline Status',
       headerClassName: 'text-[18px] font-medium',
+      sortable: true,
+      filterable: true,
+      filterType: 'select',
       render: (value) => {
         const statusColors = {
-          'Draft': 'bg-blue-100 text-blue-800',
-          'Pending Approval': 'bg-yellow-100 text-yellow-800',
-          'Approved': 'bg-green-100 text-green-800',
-          'Rejected': 'bg-red-100 text-red-800',
-          'In Review': 'bg-purple-100 text-purple-800',
-          'Level 1 Approval - RFB': 'bg-gray-100 text-gray-800'
+          'Proposal Work-in-Progress': 'bg-blue-100 text-blue-800',
+          'Proposal Review': 'bg-purple-100 text-purple-800',
+          'Price Negotiation': 'bg-yellow-100 text-yellow-800',
+          'Won': 'bg-green-100 text-green-800',
+          'Lost': 'bg-red-100 text-red-800'
         };
 
         return (
@@ -382,10 +362,11 @@ const Opportunities = () => {
     },
     {
       key: 'approval_stage',
-      header: 'Status',
-      headerClassName: 'text-[18px] font-medium hidden', // Keep hidden as requested
+      header: 'Approval Stage',
+      headerClassName: 'text-[18px] font-medium',
+      hidden: true, // Hide the old status column as requested
       render: (value) => {
-        const statusColors = {
+        const stageColors = {
           'Draft': 'bg-blue-100 text-blue-800',
           'Pending Approval': 'bg-yellow-100 text-yellow-800',
           'Approved': 'bg-green-100 text-green-800',
@@ -396,7 +377,7 @@ const Opportunities = () => {
 
         return (
           <span
-            className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[value] || 'bg-gray-100 text-gray-800'
+            className={`px-2 py-1 rounded-full text-xs font-medium ${stageColors[value] || 'bg-gray-100 text-gray-800'
               }`}
           >
             {value || '-'}
