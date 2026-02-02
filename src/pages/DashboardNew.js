@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import dashboardService from '../services/dashboardService';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Utils } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, Target, DollarSign, FolderOpen, Filter, Calendar, ChevronDown } from 'lucide-react';
-import opportunityService from '../services/opportunityService';
-import api from '../utils/api';
 
 const Dashboard = () => {
   // State for filters
@@ -35,131 +33,59 @@ const Dashboard = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Use Promise.allSettled to run requests in parallel and handle failures independently
-        const [opportunitiesResult, leadsResult] = await Promise.allSettled([
-          opportunityService.getOpportunities(),
-          api.get('/leads')
+        const response = await dashboardService.getDashboardStats();
+        const { totals, conversionFunnel, sourceDistribution } = response.data;
+
+        // Update KPI data
+        setKpiData({
+          leads: {
+            count: totals.opportunities || 0,
+            change: 0 // You can calculate this based on previous data if needed
+          },
+          opportunities: {
+            value: totals.value || 0,
+            count: totals.opportunities || 0,
+            change: 0 // You can calculate this based on previous data if needed
+          },
+          sales: {
+            count: totals.won || 0,
+            change: 0 // You can calculate this based on previous data if needed
+          },
+          projects: {
+            count: totals.open || 0,
+            change: 0 // You can calculate this based on previous data if needed
+          }
+        });
+
+        // Update funnel data
+        setFunnelData([
+          { name: 'Leads', value: conversionFunnel.total || 0, color: '#1d4ed8' },
+          { name: 'Opportunities', value: conversionFunnel.rfb || 0, color: '#3b82f6' },
+          // { name: 'Proposal', value: conversionFunnel.proposal || 0, color: '#60a5fa' },
+          { name: 'SOW', value: conversionFunnel.sow || 0, color: '#60a5fa' },
+          { name: 'Won', value: conversionFunnel.won || 0, color: '#3b82f6' }
         ]);
 
-        // Process Opportunities
-        let opportunities = [];
-        if (opportunitiesResult.status === 'fulfilled') {
-          opportunities = opportunitiesResult.value.data || [];
-        } else {
-          console.error('Error fetching opportunities:', opportunitiesResult.reason);
-        }
-
-        // Process Leads
-        let leadsData = [];
-        if (leadsResult.status === 'fulfilled') {
-          const response = leadsResult.value;
-          if (response.data && Array.isArray(response.data)) {
-            leadsData = response.data;
-          } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-            leadsData = response.data.data;
-          } else if (response.data && response.data.success && Array.isArray(response.data.data)) {
-            // Corrected access path if needed, but usually response.data is the body
-            leadsData = response.data.data;
-          }
-        } else {
-          console.error('Error fetching leads:', leadsResult.reason);
-        }
-
-        // Calculate counts for specified pipeline stages
-        const stageCounts = {
-          'Proposal Work-in-Progress': 0,
-          'Proposal Review': 0,
-          'Price Negotiation': 0,
-          'Won': 0,
-          'Lost': 0
-        };
-
-        opportunities.forEach(opp => {
-          const status = opp.pipeline_status || opp.status; // Fallback to status if pipeline_status is missing
-          if (stageCounts.hasOwnProperty(status)) {
-            stageCounts[status]++;
-          }
-        });
-
-        const newFunnelData = [
-          { name: 'Proposal Work-in-Progress', value: stageCounts['Proposal Work-in-Progress'], color: '#3b82f6' }, // Blue
-          { name: 'Proposal Review', value: stageCounts['Proposal Review'], color: '#8b5cf6' }, // Purple
-          { name: 'Price Negotiation', value: stageCounts['Price Negotiation'], color: '#f59e0b' }, // Orange
-          { name: 'Won', value: stageCounts['Won'], color: '#10b981' }, // Green
-          { name: 'Lost', value: stageCounts['Lost'], color: '#ef4444' } // Red
+        // Define a range of blue shades
+        const blueShades = [
+          '#2C6AA6', // Dark blue
+          '#3B82F6', // Blue
+          '#60A5FA', // Light blue
+          '#93C5FD', // Lighter blue
+          '#BFDBFE', // Very light blue
+          '#DBEAFE'  // Lightest blue
         ];
 
-        setFunnelData(newFunnelData);
+        // Update source distribution with different blue shades
+        const filteredSources = sourceDistribution
+          .filter(item => item.value > 0)
+          .map((item, index) => ({
+            ...item,
+            color: blueShades[index % blueShades.length] // Cycle through blue shades
+          }))
+          .sort((a, b) => b.value - a.value);
 
-        // Calculate counts for lead sources (Chart Data) - using Opportunities as per previous logic (or could switch to leads if requested, but staying consistent)
-        const sourceCounts = {};
-        const leadSources = [
-          'Advertisement', 'Cold Call', 'Employee Referral', 'External Referral',
-          'Online Store', 'Partner Organization', 'Partner Individual', 'Public Relations',
-          'Sales Email Alias', 'Seminar Partner', 'Internal Seminar', 'Trade Show',
-          'Web Download', 'Web Research', 'Chat', 'Portal', 'Others'
-        ];
-
-        leadSources.forEach(source => sourceCounts[source] = 0);
-
-        // Note: We are using 'opportunities' for Source Distribution as it was before.
-        // If the user meant "Leads Source Distribution" (from Leads table), that would be a different change.
-        // Given the request was "Source Distribution widget... remove those...", it implies the existing widget.
-        opportunities.forEach(opp => {
-          const source = opp.lead_source || 'Others';
-          const matchedSource = leadSources.find(s => s.toLowerCase() === source.toLowerCase()) || 'Others';
-          if (sourceCounts.hasOwnProperty(matchedSource)) {
-            sourceCounts[matchedSource]++;
-          } else {
-            sourceCounts['Others']++;
-          }
-        });
-
-        const sourceColors = {
-          'Advertisement': '#3b82f6',
-          'Cold Call': '#10b981',
-          'Employee Referral': '#f59e0b',
-          'External Referral': '#8b5cf6',
-          'Online Store': '#ec4899',
-          'Partner Organization': '#06b6d4',
-          'Partner Individual': '#0ea5e9',
-          'Public Relations': '#f97316',
-          'Sales Email Alias': '#6366f1',
-          'Seminar Partner': '#14b8a6',
-          'Internal Seminar': '#2dd4bf',
-          'Trade Show': '#f43f5e',
-          'Web Download': '#ef4444',
-          'Web Research': '#a855f7',
-          'Chat': '#84cc16',
-          'Portal': '#22c55e',
-          'Others': '#64748b'
-        };
-
-        const newSourceData = leadSources.map(source => ({
-          name: source,
-          value: sourceCounts[source],
-          color: sourceColors[source] || '#cbd5e1'
-        })).filter(item => item.value > 0).sort((a, b) => b.value - a.value);
-
-        setSourceData(newSourceData);
-
-
-        // KPI Calculations using LEADS data
-        const totalLeadsCount = leadsData.length;
-        const totalLeadsValue = leadsData.reduce((sum, lead) => {
-          // Handle different casing or missing values
-          const val = parseFloat(lead.estimated_deal_value || lead.amount || 0);
-          return sum + (isNaN(val) ? 0 : val);
-        }, 0);
-
-        setKpiData(prev => ({
-          ...prev,
-          leads: { count: totalLeadsCount, change: 0 },
-          opportunities: { value: totalLeadsValue, count: totalLeadsCount, change: 0 }, // Using Lead Value for Opportunities KPI as requested
-          sales: { count: stageCounts['Won'], change: 5.7 },
-          projects: { count: 36, change: 2.3 } // Keep mock
-        }));
-
+        setSourceData(filteredSources);
       } catch (error) {
         // This catch block will now only run if something unexpected happens OUTSIDE the API calls execution (like logic error)
         console.error('Error in dashboard data processing:', error);
@@ -341,9 +267,17 @@ const Dashboard = () => {
             <div className="flex flex-col space-y-4 p-4">
               {funnelData.map((stage, index) => {
                 const widthPercentage = (stage.value / funnelData[0].value) * 100;
-                const conversionRate = index > 0
-                  ? Math.round((stage.value / funnelData[index - 1].value) * 100)
-                  : 100;
+                let conversionRate = 0;
+
+                if (index === 0) {
+                  conversionRate = 100; // First stage is always 100%
+                } else if (funnelData[index - 1].value > 0) {
+                  // Calculate percentage relative to previous stage
+                  conversionRate = Math.round((stage.value / funnelData[index - 1].value) * 100);
+                }
+
+                // Ensure we don't show more than 100% conversion
+                conversionRate = Math.min(conversionRate, 100);
 
                 return (
                   <div key={stage.name} className="space-y-2">
@@ -416,27 +350,33 @@ const Dashboard = () => {
                     axisLine={false}
                   />
                   <Tooltip
-                    formatter={(value) => [`${value}`, 'Count']}
-                    labelFormatter={(label) => `Source: ${label}`}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '0.5rem',
-                      padding: '0.5rem',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                    formatter={(value) => value}
+                    labelFormatter={(label) => label}
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-white p-2 border border-gray-200 rounded shadow-sm text-sm">
+                            <p className="font-medium">{label}: {payload[0].value}</p>
+                          </div>
+                        );
+                      }
+                      return null;
                     }}
                     cursor={{ fill: 'rgba(0, 0, 0, 0.02)' }}
                   />
-                  <Bar
-                    dataKey="value"
-                    radius={[0, 4, 4, 0]}
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                  >
-                    {sourceData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
+                  {sourceData.map((entry, index) => (
+                    <Bar
+                      key={`bar-${index}`}
+                      dataKey="value"
+                      name={entry.name}
+                      data={[entry]}
+                      fill={entry.color}
+                      radius={[0, 4, 4, 0]}
+                      animationBegin={index * 100}
+                      animationDuration={800}
+                      animationEasing="ease-out"
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
