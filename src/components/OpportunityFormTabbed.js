@@ -1589,7 +1589,20 @@ const PIPELINE_STATUSES = [
                       </SelectContent>
                     </Select>
                   </div>
-                  {/* RFP Status */}
+                  
+                  {/* RFP Title */}
+                  <div>
+                    <Label htmlFor="rfpTitle">RFP Title</Label>
+                    <Input
+                      id="rfpTitle"
+                      value={formData.rfpDetails.rfpTitle || ''}
+                      onChange={(e) => updateRfpDetails('rfpTitle', e.target.value)}
+                      placeholder="Enter RFP title"
+                      className={opportunity?.isViewMode ? 'bg-gray-100' : ''}
+                    />
+                  </div>
+                  
+                  {/* RFP Description */}
                   <div>
                     <Label htmlFor="rfbDescription">RFP Description</Label>
                     <Textarea

@@ -87,7 +87,8 @@ const Dashboard = () => {
 
         setSourceData(filteredSources);
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        // This catch block will now only run if something unexpected happens OUTSIDE the API calls execution (like logic error)
+        console.error('Error in dashboard data processing:', error);
       } finally {
         setLoading(false);
       }
