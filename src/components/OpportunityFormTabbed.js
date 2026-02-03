@@ -1664,60 +1664,6 @@ const PIPELINE_STATUSES = [
 
                   {/* Q&A Logs */}
                   <div className="md:col-span-2 -mt-2">
-<<<<<<< HEAD
-                    <div className="mb-2">
-                      <Label>Q&A </Label>
-                      <div className="flex flex-col space-y-2 w-full">
-                        <div className="flex flex-col space-y-2 w-full">
-                          <Textarea
-                            value={newQaQuestion}
-                            onChange={(e) => setNewQaQuestion(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey && newQaQuestion.trim()) {
-                                e.preventDefault();
-                                const newQa = {
-                                  id: Date.now().toString(),
-                                  question: newQaQuestion.trim(),
-                                  askedBy: 'current_user',
-                                  askedAt: new Date().toISOString(),
-                                  questionSubmissionDate: new Date().toISOString(),
-                                  responseSubmissionDate: '',
-                                  answer: ''
-                                };
-                                updateRfpDetails('qaLogs', [...(formData.rfpDetails.qaLogs || []), newQa]);
-                                setNewQaQuestion('');
-                              }
-                            }}
-                            placeholder="Type your question here..."
-                            className="min-h-[80px] w-full"
-                          />
-                          <div className="flex justify-end">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                if (newQaQuestion.trim()) {
-                                  const newQa = {
-                                    id: Date.now().toString(),
-                                    question: newQaQuestion.trim(),
-                                    askedBy: 'current_user',
-                                    askedAt: new Date().toISOString(),
-                                    questionSubmissionDate: new Date().toISOString(),
-                                    responseSubmissionDate: '',
-                                    answer: ''
-                                  };
-                                  updateRfpDetails('qaLogs', [...(formData.rfpDetails.qaLogs || []), newQa]);
-                                  setNewQaQuestion('');
-                                }
-                              }}
-                              disabled={!newQaQuestion.trim()}
-                              className="w-fit"
-                            >
-                              <Plus className="mr-1 h-4 w-4" /> Add Q&A
-                            </Button>
-                          </div>
-=======
                     <Button 
                       type="button" 
                       variant="outline" 
@@ -1779,7 +1725,6 @@ const PIPELINE_STATUSES = [
     }}
   />
 </div>
->>>>>>> 925df812f449ed0bff678c2d9627d4e4a5f1eaf7
                         </div>
                         
                         <div>
