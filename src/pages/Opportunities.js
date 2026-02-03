@@ -45,7 +45,7 @@ const Opportunities = () => {
     type: 'All Leads'
   });
 
-  const statusOptions = ['All Status', 'Active', 'Inactive', 'Won', 'Lost', 'In Progress'];
+  const statusOptions = ['All Status', 'Proposal Work-in-Progress', 'Proposal Review', 'Price Negotiation', 'Won', 'Lost'];
   const [opportunityTypeOptions, setOpportunityTypeOptions] = useState(['All Leads']);
 
   // Handle filter changes
@@ -60,19 +60,19 @@ const Opportunities = () => {
   const filteredOpportunities = useMemo(() => {
     return opportunities.filter(opp => {
       // Filter by opportunity name (search)
-      const matchesSearch = filters.opportunityName === 'All Leads' || 
+      const matchesSearch = filters.opportunityName === 'All Leads' ||
         !filters.opportunityName ||
-        (opp.opportunity_name && 
-         opp.opportunity_name.toLowerCase().includes(filters.opportunityName.toLowerCase()));
-      
+        (opp.opportunity_name &&
+          opp.opportunity_name.toLowerCase().includes(filters.opportunityName.toLowerCase()));
+
       // Filter by status
-      const matchesStatus = filters.status === 'All Status' || 
-        (opp.status && opp.status === filters.status);
-      
+      const matchesStatus = filters.status === 'All Status' ||
+        (opp.pipeline_status && opp.pipeline_status === filters.status);
+
       // Filter by opportunity type (using opportunity_name as type)
-      const matchesType = filters.type === 'All Leads' || 
+      const matchesType = filters.type === 'All Leads' ||
         (opp.opportunity_name && opp.opportunity_name === filters.type);
-      
+
       return matchesSearch && matchesStatus && matchesType;
     });
   }, [opportunities, filters]);
@@ -94,11 +94,11 @@ const Opportunities = () => {
       ['Opportunity ID', 'Opportunity Name', 'Client', 'Status', 'Amount', 'End Date', 'Created By'],
       // Add more sample data if needed
     ];
-    
-    const csvContent = template.map(row => 
+
+    const csvContent = template.map(row =>
       row.map(cell => `"${cell}"`).join(',')
     ).join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     saveAs(blob, 'opportunity_template.csv');
   };
@@ -125,19 +125,19 @@ const Opportunities = () => {
       toast.warning('No data to export!');
       return;
     }
-    
+
     const headers = Object.keys(opportunities[0]);
     const csvContent = [
       headers.join(','),
-      ...opportunities.map(row => 
-        headers.map(fieldName => 
-          JSON.stringify(row[fieldName] || '', (key, value) => 
+      ...opportunities.map(row =>
+        headers.map(fieldName =>
+          JSON.stringify(row[fieldName] || '', (key, value) =>
             value === null ? '' : value
           )
         ).join(',')
       )
     ].join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     saveAs(blob, `opportunities_export_${new Date().toISOString().split('T')[0]}.csv`);
   };
@@ -212,7 +212,7 @@ const Opportunities = () => {
           .map(opp => opp.opportunity_name)
           .filter(Boolean) // Remove any undefined/null values
       )];
-      
+
       // Keep 'All Leads' as first option, then add the unique names
       setOpportunityTypeOptions(['All Leads', ...uniqueOpportunityNames]);
     }
@@ -271,35 +271,35 @@ const Opportunities = () => {
       // Set view states based on the currentStage
       const isRFPStage = currentStage === APPROVAL_STAGES.LEVEL_1_RFB;
       const isSOWStage = currentStage === APPROVAL_STAGES.LEVEL_2_SOW;
-      
+
       // Set the appropriate view states
       setIsRFPView(isRFPStage);
       setShowOnlyDetails(!isRFPStage && !isSOWStage); // Show only Details tab if not RFP or SOW stage
       setShowOnlySOW(isSOWStage);
-      
+
       // Fetch the latest opportunity data from the API
       const response = await opportunityService.getOpportunityById(opportunity.id);
-      
+
       // Set the opportunity data for viewing with view mode flag
       // For RFP and SOW stages, set isViewMode to false to enable editing
       setEditingOpportunity({
         ...response.data,
         isViewMode: isRFPStage || isSOWStage ? false : true // Allow editing in both RFP and SOW views
       });
-      
+
       setShowForm(true);
     } catch (error) {
       console.error('Error fetching opportunity details:', error);
       toast.error('Failed to load opportunity details');
-      
+
       // Fallback to using the existing data if API call fails
       const isRFPStage = currentStage === APPROVAL_STAGES.LEVEL_1_RFB;
       const isSOWStage = currentStage === APPROVAL_STAGES.LEVEL_2_SOW;
-      
+
       setIsRFPView(isRFPStage);
       setShowOnlyDetails(!isRFPStage && !isSOWStage);
       setShowOnlySOW(isSOWStage);
-      
+
       setEditingOpportunity({
         ...opportunity,
         isViewMode: isRFPStage || isSOWStage ? false : true // Allow editing in both RFP and SOW views
@@ -324,8 +324,8 @@ const Opportunities = () => {
         </span>
       )
     },
-    { 
-      key: 'client_name', 
+    {
+      key: 'client_name',
       header: 'Client',
       headerClassName: 'text-[18px] font-medium',
       render: (value) => (
@@ -335,12 +335,38 @@ const Opportunities = () => {
       )
     },
     {
-      key: 'approval_stage',
-      header: 'Status',
+      key: 'pipeline_status',
+      header: 'Pipeline Status',
       headerClassName: 'text-[18px] font-medium',
+      sortable: true,
+      filterable: true,
+      filterType: 'select',
       render: (value) => {
-        // Define status colors based on approval stage
         const statusColors = {
+          'Proposal Work-in-Progress': 'bg-blue-100 text-blue-800',
+          'Proposal Review': 'bg-purple-100 text-purple-800',
+          'Price Negotiation': 'bg-yellow-100 text-yellow-800',
+          'Won': 'bg-green-100 text-green-800',
+          'Lost': 'bg-red-100 text-red-800'
+        };
+
+        return (
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[value] || 'bg-gray-100 text-gray-800'
+              }`}
+          >
+            {value || '-'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'approval_stage',
+      header: 'Approval Stage',
+      headerClassName: 'text-[18px] font-medium',
+      hidden: true, // Hide the old status column as requested
+      render: (value) => {
+        const stageColors = {
           'Draft': 'bg-blue-100 text-blue-800',
           'Pending Approval': 'bg-yellow-100 text-yellow-800',
           'Approved': 'bg-green-100 text-green-800',
@@ -348,12 +374,11 @@ const Opportunities = () => {
           'In Review': 'bg-purple-100 text-purple-800',
           'Level 1 Approval - RFB': 'bg-gray-100 text-gray-800'
         };
-        
+
         return (
           <span
-            className={`px-2 py-1 rounded-full text-xs font-medium ${
-              statusColors[value] || 'bg-gray-100 text-gray-800'
-            }`}
+            className={`px-2 py-1 rounded-full text-xs font-medium ${stageColors[value] || 'bg-gray-100 text-gray-800'
+              }`}
           >
             {value || '-'}
           </span>
@@ -382,7 +407,7 @@ const Opportunities = () => {
       headerClassName: 'text-[18px] font-medium',
       render: (_, row) => {
         const currentStage = row.approval_stage || APPROVAL_STAGES.LEVEL_1_RFB;
-        
+
         if ((currentStage && currentStage.toString().toLowerCase() === 'approved') || (row.status && row.status.toString().toLowerCase() === 'approved')) {
           return (
             <div className="flex items-center space-x-1 text-emerald-600">
@@ -393,14 +418,14 @@ const Opportunities = () => {
         }
 
         const isLevel1 = currentStage === APPROVAL_STAGES.LEVEL_1_RFB;
-        const buttonText = isLevel1 
-          ? 'Level 1 Approval - RFP' 
+        const buttonText = isLevel1
+          ? 'Level 1 Approval - RFP'
           : 'Level 2 Approval - SOW';
-        
-        const buttonClass = isLevel1 
-          ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300' 
+
+        const buttonClass = isLevel1
+          ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300'
           : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200';
-          
+
         return (
           <Button
             variant="outline"
@@ -432,7 +457,7 @@ const Opportunities = () => {
           >
             <Eye className="h-4 w-4 text-current" />
           </Button>
-          
+
           {/* Edit Button */}
           <Button
             variant="ghost"
@@ -446,7 +471,7 @@ const Opportunities = () => {
           >
             <Edit className="h-4 w-4" />
           </Button>
-          
+
           {/* Delete Button */}
           <Button
             variant="ghost"
@@ -502,10 +527,10 @@ const Opportunities = () => {
               value={filters.opportunityName === 'All Leads' ? '' : filters.opportunityName}
               onChange={(e) => handleFilterChange('opportunityName', e.target.value)}
             />
-            
+
             {/* Status Filter */}
-            <Select 
-              value={filters.status} 
+            <Select
+              value={filters.status}
               onValueChange={(value) => handleFilterChange('status', value)}
             >
               <SelectTrigger className="w-[130px] h-9 text-sm">
@@ -519,10 +544,10 @@ const Opportunities = () => {
                 ))}
               </SelectContent>
             </Select>
-            
+
             {/* Opportunity Type Filter */}
-            <Select 
-              value={filters.type} 
+            <Select
+              value={filters.type}
               onValueChange={(value) => handleFilterChange('type', value)}
             >
               <SelectTrigger className="w-[150px] h-9 text-sm">
@@ -536,9 +561,9 @@ const Opportunities = () => {
                 ))}
               </SelectContent>
             </Select>
-            
-            <Button 
-              variant="outline" 
+
+            <Button
+              variant="outline"
               className="h-9 text-gray-700 border-gray-300"
               onClick={() => setShowImportModal(true)}
             >
@@ -546,38 +571,38 @@ const Opportunities = () => {
               Import
             </Button>
             <ImportCSVModal
-  isOpen={showImportModal}
-  onClose={() => setShowImportModal(false)}
-  onFileSelect={async (file) => {
-    try {
-      const response = await opportunityService.importOpportunities(file);
-      toast.success('Opportunities imported successfully!');
-      fetchOpportunities(); 
-      setShowImportModal(false);
-      return response;
-    } catch (error) {
-      console.error('Import error:', error);
-      const errorMessage = error.response?.data?.message || 
-                         error.message || 
-                         'Failed to import opportunities. Please try again.';
-      toast.error(`Import failed: ${errorMessage}`);
-      throw error;
-    }
-  }}
-  onDownloadTemplate={async () => {
-    try {
-      const templateBlob = await opportunityService.downloadTemplate();
-      return templateBlob;
-    } catch (error) {
-      console.error('Error downloading template:', error);
-      toast.error('Failed to download template. Please try again.');
-      throw error;
-    }
-  }}
-  title="Import Opportunities"
-/>
-            <Button 
-              variant="outline" 
+              isOpen={showImportModal}
+              onClose={() => setShowImportModal(false)}
+              onFileSelect={async (file) => {
+                try {
+                  const response = await opportunityService.importOpportunities(file);
+                  toast.success('Opportunities imported successfully!');
+                  fetchOpportunities();
+                  setShowImportModal(false);
+                  return response;
+                } catch (error) {
+                  console.error('Import error:', error);
+                  const errorMessage = error.response?.data?.message ||
+                    error.message ||
+                    'Failed to import opportunities. Please try again.';
+                  toast.error(`Import failed: ${errorMessage}`);
+                  throw error;
+                }
+              }}
+              onDownloadTemplate={async () => {
+                try {
+                  const templateBlob = await opportunityService.downloadTemplate();
+                  return templateBlob;
+                } catch (error) {
+                  console.error('Error downloading template:', error);
+                  toast.error('Failed to download template. Please try again.');
+                  throw error;
+                }
+              }}
+              title="Import Opportunities"
+            />
+            <Button
+              variant="outline"
               className="h-9 text-gray-700 border-gray-300"
               onClick={handleExportData}
             >
@@ -608,31 +633,31 @@ const Opportunities = () => {
         filterOptions={filterOptions}
         testId="opportunities-table"
       />
- 
+
       <Dialog open={showForm} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingOpportunity?.isViewMode 
-                ? (isRFPView ? 'Opportunity - RFP Details' 
-                   : showOnlySOW ? 'SOW Details' 
-                   : 'View Lead')
-                : showOnlySOW ? 'SOW Details' 
-                : isRFPView ? 'Opportunity-RFP' 
-                : editingOpportunity ? 'Edit Lead' 
-                : 'Add New Lead'}
+              {editingOpportunity?.isViewMode
+                ? (isRFPView ? 'Opportunity - RFP Details'
+                  : showOnlySOW ? 'SOW Details'
+                    : 'View Lead')
+                : showOnlySOW ? 'SOW Details'
+                  : isRFPView ? 'Opportunity-RFP'
+                    : editingOpportunity ? 'Edit Lead'
+                      : 'Add New Lead'}
             </DialogTitle>
           </DialogHeader>
-          <OpportunityFormTabbed 
-            opportunity={editingOpportunity} 
-            onClose={handleFormClose} 
+          <OpportunityFormTabbed
+            opportunity={editingOpportunity}
+            onClose={handleFormClose}
             showOnlyRFP={isRFPView}
             showOnlyDetails={showOnlyDetails}
             showOnlySOW={showOnlySOW}
           />
         </DialogContent>
       </Dialog>
- 
+
       <AttachmentPreviewModal
         isOpen={showAttachments}
         onClose={() => setShowAttachments(false)}
@@ -642,5 +667,5 @@ const Opportunities = () => {
     </div>
   );
 };
- 
+
 export default Opportunities;

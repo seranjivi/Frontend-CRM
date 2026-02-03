@@ -224,17 +224,19 @@ const RFPDetails = () => {
         </span>
       )
     },
-    {
-      key: 'rfpManager',
-      header: 'RFP Manager',
-    },
+    // {
+    //   key: 'rfpManager',
+    //   header: 'RFP Manager',
+    // },
     {
       key: 'submissionDeadline',
       header: 'Submission Deadline',
+      render: (date) => date ? new Date(date).toLocaleDateString() : '-',
     },
     {
       key: 'createdOn',
       header: 'Created On',
+      render: (date) => date ? new Date(date).toLocaleDateString() : '-',
     }
   ];
 

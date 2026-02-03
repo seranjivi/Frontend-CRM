@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
-import { Plus, Search, Download, Upload, FileText, Eye, Edit2, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Plus, Search, Download, Upload, FileText, Eye, Edit, MoreHorizontal, Trash2 } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
@@ -20,6 +20,7 @@ const SOWs = () => {
   const [editingSOW, setEditingSOW] = useState(null);
   const [viewingSOW, setViewingSOW] = useState(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [filters, setFilters] = useState({
     status: 'All Status',
     client: 'All Clients'
@@ -142,6 +143,7 @@ const SOWs = () => {
         contract_value: fullSOW.contract_value,
         contract_currency: fullSOW.contract_currency
       });
+      setIsEditMode(false);
       setIsViewDialogOpen(true);
     } catch (error) {
       console.error('Error fetching SOW details:', error);
@@ -156,9 +158,89 @@ const SOWs = () => {
     setViewingSOW(null);
   };
 
-  const handleEditSOW = (sow) => {
-    setEditingSOW(sow);
-    setShowForm(true);
+  const handleEditSOW = async (sow) => {
+    try {
+      setLoading(true);
+      // Fetch the latest SOW data
+      const numericId = sow.id.replace('SOW-', '');
+      const fullSOW = await sowService.getSOW(numericId);
+      setViewingSOW({
+        ...sow,
+        ...fullSOW,
+        sow_id: fullSOW.sow_id,
+        sow_title: fullSOW.sow_title,
+        sow_status: fullSOW.sow_status,
+        client_name: fullSOW.client_name,
+        target_kickoff_date: fullSOW.target_kickoff_date,
+        contract_value: fullSOW.contract_value,
+        contract_currency: fullSOW.contract_currency
+      });
+      setIsEditMode(true);
+      setIsViewDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching SOW details:', error);
+      toast.error('Failed to load SOW details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateSOW = async () => {
+    if (!viewingSOW) return;
+    
+    try {
+      setLoading(true);
+      
+      // Extract numeric ID from viewingSOW.id (format: 'SOW-123') or use sow_id directly
+      const numericId = viewingSOW.id ? viewingSOW.id.replace('SOW-', '') : viewingSOW.sow_id;
+      
+      if (!numericId) {
+        throw new Error('Invalid SOW ID');
+      }
+      
+      // Prepare the data to be sent to the API
+      const updateData = {
+        sow_id: numericId,
+        sow_title: viewingSOW.sow_title,
+        sow_status: viewingSOW.sow_status,
+        client_name: viewingSOW.client_name,
+        target_kickoff_date: viewingSOW.target_kickoff_date,
+        contract_value: viewingSOW.contract_value,
+        contract_currency: viewingSOW.contract_currency,
+        scope_overview: viewingSOW.scope_overview,
+        // Add any other fields that need to be updated
+      };
+      
+      // Call the update API with the numeric ID
+      await sowService.updateSOW(numericId, updateData);
+      
+      toast.success('SOW updated successfully');
+      setIsEditMode(false);
+      
+      // Refresh the SOWs list
+      const response = await sowService.getSOWs();
+      const formattedSOWs = response.data.map(sow => ({
+        id: `SOW-${sow.sow_id}`,
+        title: sow.sow_title,
+        client: sow.client_name || '-',
+        status: sow.sow_status,
+        targetKickoffDate: sow.target_kickoff_date,
+        value: parseFloat(sow.contract_value) || 0,
+        currency: sow.contract_currency,
+        ...sow
+      }));
+      setSOWs(formattedSOWs);
+      setFilteredSOWs(formattedSOWs);
+    } catch (error) {
+      console.error('Error updating SOW:', error);
+      toast.error('Failed to update SOW');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
     setIsViewDialogOpen(false);
   };
 
@@ -254,11 +336,14 @@ const SOWs = () => {
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => handleEditSOW(row)}
+        onClick={async (e) => {
+          e.stopPropagation();
+          await handleEditSOW(row);
+        }}
         className="h-8 w-8 p-0 hover:bg-gray-100 text-blue-600 hover:text-blue-700"
         title="Edit SOW"
       >
-        <Edit2 className="h-4 w-4" />
+        <Edit className="h-4 w-4" />
       </Button>
       <Button
         variant="ghost"
@@ -390,8 +475,11 @@ const SOWs = () => {
         open={isViewDialogOpen}
         onClose={handleCloseViewDialog}
         sowData={viewingSOW}
+        isEditMode={isEditMode}
         onEdit={() => handleEditSOW(viewingSOW)}
         onDelete={() => handleDeleteSOW(viewingSOW)}
+        onUpdate={handleUpdateSOW}
+        onCancelEdit={handleCancelEdit}
       />
     </div>
   );
