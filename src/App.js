@@ -26,7 +26,7 @@ import Forecast from './pages/Forecast';
 import UserManagement from './pages/UserManagement';
 import RFPDetails from './pages/RFPDetails';
 import SOWForm from './components/SOWForm';
-import OpportunityManagement from './pages/opportunity-management';
+import OpportunityManagement from './pages/opportunity-management/OppsDashboard';
 
 function App() {
   return (

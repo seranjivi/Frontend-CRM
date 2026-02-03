@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Filter, X } from 'lucide-react';
 import masterDataService from '../services/masterDataService';
 import DateFilter from './DateFilter';
-
+//
 const ColumnFilter = ({ column, data, onFilterChange, activeFilters = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -54,24 +54,24 @@ const ColumnFilter = ({ column, data, onFilterChange, activeFilters = [] }) => {
           const values = new Set();
           data.forEach(row => {
             let value = row[column.key];
-            
+
             // Handle special cases for combined columns
             if (column.key === 'contact_details' && (row.contact_email || row.contact_phone)) {
               value = `${row.contact_email || ''} ${row.contact_phone || ''}`.trim();
             }
-            
+
             if (value && value !== 'N/A' && value !== '') {
               values.add(value);
             }
           });
-          
+
           const sortedValues = Array.from(values).sort((a, b) => {
             if (typeof a === 'string' && typeof b === 'string') {
               return a.localeCompare(b);
             }
             return a - b;
           });
-          
+
           setUniqueValues(sortedValues);
         }
       };
@@ -117,7 +117,7 @@ const ColumnFilter = ({ column, data, onFilterChange, activeFilters = [] }) => {
     const newSelectedValues = selectedValues.includes(value)
       ? selectedValues.filter(v => v !== value)
       : [...selectedValues, value];
-    
+
     setSelectedValues(newSelectedValues);
     onFilterChange(column.key, newSelectedValues);
   };
@@ -134,9 +134,8 @@ const ColumnFilter = ({ column, data, onFilterChange, activeFilters = [] }) => {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`p-1 rounded hover:bg-slate-100 transition-colors ${
-          hasActiveFilter ? 'text-blue-600 bg-blue-50' : 'text-slate-500'
-        }`}
+        className={`p-1 rounded hover:bg-slate-100 transition-colors ${hasActiveFilter ? 'text-blue-600 bg-blue-50' : 'text-slate-500'
+          }`}
         title={`Filter by ${column.header}`}
       >
         <Filter className="h-4 w-4" />
@@ -156,7 +155,7 @@ const ColumnFilter = ({ column, data, onFilterChange, activeFilters = [] }) => {
             </div>
 
             {/* Use DateFilter for date columns, otherwise use regular filter */}
-            {column.key === 'created_at' ? (
+            {column.filterType === 'date' ? (
               <DateFilter
                 column={column}
                 onFilterChange={onFilterChange}
