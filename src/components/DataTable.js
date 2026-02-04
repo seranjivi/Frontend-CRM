@@ -3,8 +3,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Search, ChevronLeft, ChevronRight, Download, Filter, Edit2, Trash2, FilterX, Eye, Plus } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Download, Filter, Edit2, Trash2, FilterX, Eye, Plus, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import ColumnFilter from './ColumnFilter';
+//
 
 const DataTable = ({
   data = [],
@@ -20,7 +22,7 @@ const DataTable = ({
   activeFilters = [],
   onFilterChange,
   renderToolbarActions,
-  customActions,  
+  customActions,
   showEdit = true,
   viewButtonClass = 'h-8 w-8 p-0 text-gray-600 hover:text-gray-800',
   editButtonClass = 'h-8 w-8 p-0 text-blue-600 hover:text-blue-800',
@@ -32,50 +34,59 @@ const DataTable = ({
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const itemsPerPage = 10;
 
-  // Apply filters
-  let filteredData = data.filter((item) => {
-    // Search filter
-    const searchStr = searchTerm.toLowerCase();
-    const matchesSearch = columns.some((col) => {
-      const value = item[col.key];
-      return value?.toString().toLowerCase().includes(searchStr);
-    });
-
-    if (!matchesSearch) return false;
-
-    return true;
-  });
-
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
-
-  // Sort data
-  const sortedData = [...paginatedData].sort((a, b) => {
+  // 1. Sort data FIRST
+  const sortedData = [...data].sort((a, b) => {
     if (!sortConfig.key) return 0;
     const aVal = a[sortConfig.key];
     const bVal = b[sortConfig.key];
+
+    if (aVal === null || aVal === undefined) return 1;
+    if (bVal === null || bVal === undefined) return -1;
+
     if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
     if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
     return 0;
   });
 
+  // 2. Apply search filter on sorted data
+  let filteredData = sortedData.filter((item) => {
+    const searchStr = searchTerm.toLowerCase();
+    if (!searchStr) return true;
+
+    return columns.some((col) => {
+      const value = item[col.key];
+      return value?.toString().toLowerCase().includes(searchStr);
+    });
+  });
+
+  // 3. Apply pagination on filtered and sorted data
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+
   const handleSort = (key) => {
+    if (key === 'actions') return;
     setSortConfig((prev) => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
     }));
   };
 
+  const getSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) return <ArrowUpDown className="ml-2 h-4 w-4 text-gray-400" />;
+    return sortConfig.direction === 'asc'
+      ? <ArrowUp className="ml-2 h-4 w-4 text-gray-900" />
+      : <ArrowDown className="ml-2 h-4 w-4 text-gray-900" />;
+  };
+
   const handleExport = () => {
     if (onExport) {
-      onExport(sortedData);
+      onExport(filteredData); // Export all filtered data, not just paginated
     } else {
       // Default CSV export
       const csvContent = [
         columns.map((col) => col.header).join(','),
-        ...sortedData.map((row) => columns.map((col) => {
+        ...filteredData.map((row) => columns.map((col) => {
           const val = row[col.key] || '';
           return typeof val === 'string' && val.includes(',') ? `"${val}"` : val;
         }).join(',')),
@@ -91,15 +102,32 @@ const DataTable = ({
 
   return (
     <div className="space-y-4">
-      
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
               {columns.map((column) => (
-                <TableHead key={column.key} className="bg-blue-50">
-                  <div className="flex items-center font-medium text-sm text-gray-900">
-                    {column.header}
+                <TableHead
+                  key={column.key}
+                  className={`bg-blue-50 ${column.key !== 'actions' ? 'cursor-pointer hover:bg-blue-100 transition-colors' : ''}`}
+                >
+                  <div className="flex items-center justify-between font-medium text-sm text-gray-900">
+                    <div
+                      className="flex items-center flex-1"
+                      onClick={() => handleSort(column.key)}
+                    >
+                      {column.header}
+                      {column.key !== 'actions' && getSortIcon(column.key)}
+                    </div>
+                    {column.filterable && (
+                      <ColumnFilter
+                        column={column}
+                        data={data}
+                        onFilterChange={onFilterChange}
+                        activeFilters={activeFilters}
+                      />
+                    )}
                   </div>
                 </TableHead>
               ))}
@@ -111,8 +139,8 @@ const DataTable = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedData.length > 0 ? (
-              sortedData.map((item, rowIndex) => (
+            {paginatedData.length > 0 ? (
+              paginatedData.map((item, rowIndex) => (
                 <TableRow key={rowIndex}>
                   {columns.map((column) => (
                     <TableCell key={`${rowIndex}-${column.key}`}>
@@ -218,7 +246,7 @@ const DataTable = ({
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            
+
             {/* Page numbers */}
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               let pageNum;
@@ -229,9 +257,9 @@ const DataTable = ({
               } else {
                 pageNum = currentPage - 2 + i;
               }
-              
+
               if (pageNum > totalPages) return null;
-              
+
               return (
                 <Button
                   key={pageNum}
@@ -244,11 +272,11 @@ const DataTable = ({
                 </Button>
               );
             })}
-            
+
             {totalPages > 5 && currentPage < totalPages - 2 && (
               <span className="px-2">...</span>
             )}
-            
+
             {totalPages > 5 && currentPage < totalPages - 2 && (
               <Button
                 variant="outline"
@@ -259,7 +287,7 @@ const DataTable = ({
                 {totalPages}
               </Button>
             )}
-            
+
             <Button
               variant="outline"
               size="sm"

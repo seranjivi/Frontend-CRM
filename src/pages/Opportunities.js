@@ -14,8 +14,10 @@ import { formatDate } from '../utils/dateUtils';
 import { saveAs } from 'file-saver';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import DateField from '../components/DateField';
 
 // Approval stage constants
+//
 const APPROVAL_STAGES = {
   LEVEL_1_RFB: 'LEVEL_1_RFB',
   LEVEL_2_SOW: 'LEVEL_2_SOW',
@@ -41,9 +43,11 @@ const Opportunities = () => {
     opportunityName: 'All Leads',
     status: 'All Status',
     client: 'All Clients',
-    closeDate: 'All Dates',
+    closeDate: '',
     type: 'All Leads'
   });
+
+  const [activeTableFilters, setActiveTableFilters] = useState([]);
 
   const statusOptions = ['All Status', 'Proposal Work-in-Progress', 'Proposal Review', 'Price Negotiation', 'Won', 'Lost'];
   const [opportunityTypeOptions, setOpportunityTypeOptions] = useState(['All Leads']);
@@ -73,9 +77,42 @@ const Opportunities = () => {
       const matchesType = filters.type === 'All Leads' ||
         (opp.opportunity_name && opp.opportunity_name === filters.type);
 
-      return matchesSearch && matchesStatus && matchesType;
+      // Filter by close date
+      let matchesDate = true;
+      if (filters.closeDate) {
+        if (!opp.close_date) {
+          matchesDate = false;
+        } else {
+          const oppDate = new Date(opp.close_date).toISOString().split('T')[0];
+          matchesDate = oppDate === filters.closeDate;
+        }
+      }
+
+      // Filter by active table filters (from column headers)
+      const matchesTableFilters = activeTableFilters.every(filter => {
+        if (!filter.values || filter.values.length === 0) return true;
+
+        const value = opp[filter.column];
+        if (!value) return false;
+
+        if (filter.column === 'close_date') {
+          const oppDate = new Date(value).toISOString().split('T')[0];
+          const filterValue = filter.values[0];
+
+          if (filterValue.includes(' to ')) {
+            const [from, to] = filterValue.split(' to ');
+            return oppDate >= from && oppDate <= to;
+          } else {
+            return oppDate === filterValue;
+          }
+        }
+
+        return filter.values.some(v => value.toString().toLowerCase().includes(v.toLowerCase()));
+      });
+
+      return matchesSearch && matchesStatus && matchesType && matchesDate && matchesTableFilters;
     });
-  }, [opportunities, filters]);
+  }, [opportunities, filters, activeTableFilters]);
 
   // Clear all filters
   const clearFilters = () => {
@@ -318,6 +355,7 @@ const Opportunities = () => {
       key: 'opportunity_name',
       header: 'Name',
       headerClassName: 'text-[18px] font-medium',
+      sortable: true,
       render: (value) => (
         <span className="font-medium text-sm">
           {value || 'N/A'}
@@ -328,6 +366,9 @@ const Opportunities = () => {
       key: 'client_name',
       header: 'Client',
       headerClassName: 'text-[18px] font-medium',
+      sortable: true,
+      filterable: true,
+      filterType: 'text',
       render: (value) => (
         <span className="text-sm">
           {value || 'N/A'}
@@ -336,12 +377,13 @@ const Opportunities = () => {
     },
     {
       key: 'pipeline_status',
-      header: 'Pipeline Status',
+      header: 'Status',
       headerClassName: 'text-[18px] font-medium',
       sortable: true,
       filterable: true,
       filterType: 'select',
       render: (value) => {
+        // Define status colors based on pipeline status
         const statusColors = {
           'Proposal Work-in-Progress': 'bg-blue-100 text-blue-800',
           'Proposal Review': 'bg-purple-100 text-purple-800',
@@ -399,6 +441,9 @@ const Opportunities = () => {
       key: 'close_date',
       header: 'End Date',
       headerClassName: 'text-[18px] font-medium',
+      sortable: true,
+      filterable: true,
+      filterType: 'date',
       render: (value) => value ? new Date(value).toLocaleDateString() : 'N/A'
     },
     {
@@ -562,6 +607,16 @@ const Opportunities = () => {
               </SelectContent>
             </Select>
 
+            <div className="w-[150px]">
+              <DateField
+                value={filters.closeDate}
+                onChange={(e) => handleFilterChange('closeDate', e.target.value)}
+                placeholder="End Date"
+                label={null}
+                name="filter-end-date"
+              />
+            </div>
+
             <Button
               variant="outline"
               className="h-9 text-gray-700 border-gray-300"
@@ -632,6 +687,20 @@ const Opportunities = () => {
         // onImport={handleImport}
         filterOptions={filterOptions}
         testId="opportunities-table"
+        activeFilters={activeTableFilters}
+        onFilterChange={(column, values) => {
+          setActiveTableFilters(prev => {
+            const existing = prev.find(f => f.column === column);
+            if (existing) {
+              if (values.length === 0) {
+                return prev.filter(f => f.column !== column);
+              }
+              return prev.map(f => f.column === column ? { ...f, values } : f);
+            }
+            if (values.length === 0) return prev;
+            return [...prev, { column, values }];
+          });
+        }}
       />
 
       <Dialog open={showForm} onOpenChange={handleDialogOpenChange}>
