@@ -76,7 +76,8 @@ const [selectedFiles, setSelectedFiles] = useState([]);
     { code: 'USD', symbol: '$', name: 'US Dollar' },
     { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
     { code: 'EUR', symbol: '€', name: 'Euro' },
-    { code: 'GBP', symbol: '£', name: 'British Pound' }
+    { code: 'GBP', symbol: '£', name: 'British Pound' },
+    { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' }
   ];
 
 const OPPORTUNITY_TYPES = [
@@ -183,6 +184,7 @@ const PIPELINE_STATUSES = [
       portalUrl: '',
       questionSubmissionDate: '',
       responseSubmissionDate: '',
+      responseSubmittedDate: '',
       comments: '',
       qaLogs: []
     },
@@ -199,7 +201,13 @@ const PIPELINE_STATUSES = [
     sowDocuments: []
   };
 
-  const [formData, setFormData] = useState(defaultFormData);
+  const [formData, setFormData] = useState({
+    ...defaultFormData,
+    rfpDetails: {
+      ...defaultFormData.rfpDetails,
+      responseSubmittedDate: ''
+    }
+  });
   const [users, setUsers] = useState({
     all: [],
     technicalPocUsers: [],
@@ -449,6 +457,7 @@ const PIPELINE_STATUSES = [
           portalUrl: opportunity.portal_url || opportunity.rfpDetails?.portalUrl || '',
           questionSubmissionDate: opportunity.question_submission_date || opportunity.rfpDetails?.questionSubmissionDate || '',
           responseSubmissionDate: opportunity.response_submission_date || opportunity.rfpDetails?.responseSubmissionDate || '',
+          responseSubmittedDate: opportunity.responseSubmittedDate || opportunity.rfpDetails?.responseSubmittedDate || '',
           comments: opportunity.comments || opportunity.rfpDetails?.comments || '',
           qaLogs: Array.isArray(opportunity.qa_logs)
             ? opportunity.qa_logs
@@ -625,9 +634,12 @@ const PIPELINE_STATUSES = [
           bid_manager: formData.rfpDetails?.bidManager || formData.opportunity.assignedTo || '',
           submission_mode: formData.rfpDetails?.submissionMode || 'paid',
           portal_url: formData.rfpDetails?.portalUrl || '',
-          question_submission_date: formData.rfpDetails?.questionSubmissionDate || '',
-          response_submission_date: formData.rfpDetails?.responseSubmissionDate || '',
+          question_submission_date: formData.rfpDetails?.questionSubmissionDate || null,
+          response_submission_date: formData.rfpDetails?.responseSubmissionDate || null,
+          response_submitted_date: formData.rfpDetails?.responseSubmittedDate || null,
           comments: formData.rfpDetails?.comments || '',
+          amount: parseFloat(formData.rfpDetails?.amount) || 0,
+          currency: formData.rfpDetails?.currency || 'USD',
           opportunity_id: opportunityId,
           rfpDocuments: formData.rfpDocuments || []
         };
@@ -1068,7 +1080,7 @@ const PIPELINE_STATUSES = [
                     </div>
                   </div>
 
-                  <div>
+                  {/* <div>
                     <div>
                       <Label htmlFor="amount">Amount</Label>
                       <div className="flex">
@@ -1103,7 +1115,7 @@ const PIPELINE_STATUSES = [
                         />
                       </div>
                     </div>
-                  </div>
+                  </div> */}
 
                   {/* Type */}
                   <div>
@@ -1601,6 +1613,42 @@ const PIPELINE_STATUSES = [
                       className={opportunity?.isViewMode ? 'bg-gray-100' : ''}
                     />
                   </div>
+
+                  {/* Amount and Currency */}
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <Label htmlFor="rfpAmount">Amount</Label>
+                      <Input
+                        id="rfpAmount"
+                        type="number"
+                        value={formData.rfpDetails.amount || ''}
+                        onChange={(e) => updateRfpDetails('amount', e.target.value)}
+                        placeholder="Enter amount"
+                        min="0"
+                        step="0.01"
+                        className={opportunity?.isViewMode ? 'bg-gray-100' : ''}
+                      />
+                    </div>
+                    <div className="w-32">
+                      <Label htmlFor="rfpCurrency">Currency</Label>
+                      <Select
+                        value={formData.rfpDetails.currency || 'USD'}
+                        onValueChange={(value) => updateRfpDetails('currency', value)}
+                        disabled={opportunity?.isViewMode}
+                      >
+                        <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
+                          <SelectValue placeholder="Select currency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CURRENCIES.map((currency) => (
+                            <SelectItem key={currency.code} value={currency.code}>
+                              {currency.code} ({currency.symbol})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                   
                   {/* RFP Description */}
                   <div>
@@ -1689,148 +1737,159 @@ const PIPELINE_STATUSES = [
                     {isQaExpanded && (
                       <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                         <div>
-  <Label htmlFor="question-submission-date">Question Submission Date</Label>
-  <Input
-    id="question-submission-date"
-    type="date"
-    className="mt-1 w-full"
-    value={formData.rfpDetails.questionSubmissionDate ? 
-      formatDateForInput(formData.rfpDetails.questionSubmissionDate) : ''}
-    onChange={(e) => {
-      // Update root level date
-      updateRfpDetails('questionSubmissionDate', e.target.value);
-      
-      // Also update qaLogs if it exists
-      if (formData.rfpDetails.qaLogs?.length > 0) {
-        const updatedQaLogs = [...formData.rfpDetails.qaLogs];
-        updatedQaLogs[0] = {
-          ...updatedQaLogs[0],
-          questionSubmissionDate: e.target.value,
-          askedAt: e.target.value || new Date().toISOString()
-        };
-        updateRfpDetails('qaLogs', updatedQaLogs);
-      }
-    }}
-  />
-</div>
-                          <div>
-  <Label htmlFor="response-submission-date">Response Submission Date</Label>
-  <Input
-    id="response-submission-date"
-    type="date"
-    className="mt-1 w-full"
-    value={formData.rfpDetails.responseSubmissionDate ? 
-      formatDateForInput(formData.rfpDetails.responseSubmissionDate) : ''}
-    onChange={(e) => {
-      // Update root level date
-      updateRfpDetails('responseSubmissionDate', e.target.value);
-      
-      // Also update qaLogs if it exists
-      if (formData.rfpDetails.qaLogs?.length > 0) {
-        const updatedQaLogs = [...formData.rfpDetails.qaLogs];
-        updatedQaLogs[0] = {
-          ...updatedQaLogs[0],
-          responseSubmissionDate: e.target.value
-        };
-        updateRfpDetails('qaLogs', updatedQaLogs);
-      }
-    }}
-  />
-</div>
+                          <div className="md:col-span-2 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <Label htmlFor="question-submission-date">Question Submission Date</Label>
+                                <Input
+                                  id="question-submission-date"
+                                  type="date"
+                                  className="mt-1 w-full"
+                                  value={formData.rfpDetails.questionSubmissionDate ? 
+                                    formatDateForInput(formData.rfpDetails.questionSubmissionDate) : ''}
+                                  onChange={(e) => {
+                                    updateRfpDetails('questionSubmissionDate', e.target.value);
+                                    if (formData.rfpDetails.qaLogs?.length > 0) {
+                                      const updatedQaLogs = [...formData.rfpDetails.qaLogs];
+                                      updatedQaLogs[0] = {
+                                        ...updatedQaLogs[0],
+                                        questionSubmissionDate: e.target.value,
+                                        askedAt: e.target.value || new Date().toISOString()
+                                      };
+                                      updateRfpDetails('qaLogs', updatedQaLogs);
+                                    }
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="response-submission-date">Response Submission Date</Label>
+                                <Input
+                                  id="response-submission-date"
+                                  type="date"
+                                  className="mt-1 w-full"
+                                  value={formData.rfpDetails.responseSubmissionDate ? 
+                                    formatDateForInput(formData.rfpDetails.responseSubmissionDate) : ''}
+                                  onChange={(e) => {
+                                    updateRfpDetails('responseSubmissionDate', e.target.value);
+                                    if (formData.rfpDetails.qaLogs?.length > 0) {
+                                      const updatedQaLogs = [...formData.rfpDetails.qaLogs];
+                                      updatedQaLogs[0] = {
+                                        ...updatedQaLogs[0],
+                                        responseSubmissionDate: e.target.value
+                                      };
+                                      updateRfpDetails('qaLogs', updatedQaLogs);
+                                    }
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="response-submitted-date">Response Submitted Date</Label>
+                                <Input
+                                  id="response-submitted-date"
+                                  type="date"
+                                  className="mt-1 w-full"
+                                  value={formData.rfpDetails.responseSubmittedDate ? 
+                                    formatDateForInput(formData.rfpDetails.responseSubmittedDate) : ''}
+                                  onChange={(e) => {
+                                    updateRfpDetails('responseSubmittedDate', e.target.value);
+                                    if (formData.rfpDetails.qaLogs?.length > 0) {
+                                      const updatedQaLogs = [...formData.rfpDetails.qaLogs];
+                                      updatedQaLogs[0] = {
+                                        ...updatedQaLogs[0],
+                                        responseSubmittedDate: e.target.value
+                                      };
+                                      updateRfpDetails('qaLogs', updatedQaLogs);
+                                    }
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <Label htmlFor="qa-comment">Comment Box</Label>
+                              <Textarea
+                                id="qa-comment"
+                                className="mt-1 w-full min-h-[100px]"
+                                placeholder="Add your comments here..."
+                                value={formData.rfpDetails.comments || ''}
+                                onChange={(e) => {
+                                  updateRfpDetails('comments', e.target.value);
+                                  if (formData.rfpDetails.qaLogs?.length > 0) {
+                                    const updatedQaLogs = [...formData.rfpDetails.qaLogs];
+                                    updatedQaLogs[0] = {
+                                      ...updatedQaLogs[0],
+                                      question: e.target.value
+                                    };
+                                    updateRfpDetails('qaLogs', updatedQaLogs);
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <Label>QA Document Upload</Label>
+                              <div className="mt-1 flex flex-col items-center px-6 pt-5 pb-6 border-2 border-dashed border-gray-300 rounded-md">
+                                <div className="space-y-1 text-center">
+                                  <div className="flex text-sm text-muted-foreground">
+                                    <label
+                                      htmlFor="file-upload"
+                                      className="relative cursor-pointer bg-transparent rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none"
+                                    >
+                                      <span>Upload a file</span>
+                                      <input
+                                        id="file-upload"
+                                        name="file-upload"
+                                        type="file"
+                                        className="sr-only"
+                                        accept=".pdf,.doc,.docx"
+                                        onChange={(e) => {
+                                          const files = Array.from(e.target.files);
+                                          setSelectedFiles(files);
+                                          updateRfpDetails('qaDocuments', files);
+                                        }}
+                                      />
+                                    </label>
+                                    <p className="pl-1">or drag and drop</p>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    PDF, DOC, DOCX up to 10MB
+                                  </p>
+                                </div>
+                                
+                                {selectedFiles.length > 0 && (
+                                  <div className="mt-4 w-full">
+                                    <p className="text-sm font-medium mb-2">Selected Files:</p>
+                                    <ul className="space-y-2">
+                                      {selectedFiles.map((file, index) => (
+                                        <li key={index} className="flex items-center justify-between p-2 border rounded">
+                                          <div className="flex items-center space-x-2">
+                                            <FileText className="h-4 w-4 text-blue-500" />
+                                            <span className="text-sm truncate max-w-xs">{file.name}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                              {(file.size / 1024 / 1024).toFixed(2)} MB
+                                            </span>
+                                          </div>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 w-6 p-0"
+                                            onClick={() => {
+                                              const newFiles = [...selectedFiles];
+                                              newFiles.splice(index, 1);
+                                              setSelectedFiles(newFiles);
+                                              updateRfpDetails('qaDocuments', newFiles);
+                                            }}
+                                          >
+                                            <X className="h-4 w-4" />
+                                          </Button>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        
-                        <div>
-  <Label htmlFor="qa-comment">Comment Box</Label>
-  <Textarea
-    id="qa-comment"
-    className="mt-1 w-full min-h-[100px]"
-    placeholder="Add your comments here..."
-    value={formData.rfpDetails.comments || ''}
-    onChange={(e) => {
-      // Update root level comments
-      updateRfpDetails('comments', e.target.value);
-      
-      // Also update qaLogs if it exists
-      if (formData.rfpDetails.qaLogs?.length > 0) {
-        const updatedQaLogs = [...formData.rfpDetails.qaLogs];
-        updatedQaLogs[0] = {
-          ...updatedQaLogs[0],
-          question: e.target.value
-        };
-        updateRfpDetails('qaLogs', updatedQaLogs);
-      }
-    }}
-  />
-</div>
-                        
-                       <div>
-  <Label>QA Document Upload</Label>
-  <div className="mt-1 flex flex-col items-center px-6 pt-5 pb-6 border-2 border-dashed border-gray-300 rounded-md">
-    <div className="space-y-1 text-center">
-      <div className="flex text-sm text-muted-foreground">
-        <label
-          htmlFor="file-upload"
-          className="relative cursor-pointer bg-transparent rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none"
-        >
-          <span>Upload a file</span>
-          <input
-            id="file-upload"
-            name="file-upload"
-            type="file"
-            className="sr-only"
-            accept=".pdf,.doc,.docx"
-            onChange={(e) => {
-              const files = Array.from(e.target.files);
-              setSelectedFiles(files);
-              
-              // Also update the form data if needed
-              updateRfpDetails('qaDocuments', files);
-            }}
-          />
-        </label>
-        <p className="pl-1">or drag and drop</p>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        PDF, DOC, DOCX up to 10MB
-      </p>
-    </div>
-    
-    {/* Display selected files */}
-    {selectedFiles.length > 0 && (
-      <div className="mt-4 w-full">
-        <p className="text-sm font-medium mb-2">Selected Files:</p>
-        <ul className="space-y-2">
-          {selectedFiles.map((file, index) => (
-            <li key={index} className="flex items-center justify-between p-2 border rounded">
-              <div className="flex items-center space-x-2">
-                <FileText className="h-4 w-4 text-blue-500" />
-                <span className="text-sm truncate max-w-xs">{file.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
-                </span>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={() => {
-                  const newFiles = [...selectedFiles];
-                  newFiles.splice(index, 1);
-                  setSelectedFiles(newFiles);
-                  updateRfpDetails('qaDocuments', newFiles);
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    )}
-  </div>
-</div>
                       </div>
                     )}
                   </div>

@@ -43,6 +43,9 @@ const RFPViewDialog = ({
     portalUrl: 'https://',
     questionSubmissionDate: '',
     responseSubmissionDate: '',
+    responseSubmittedDate: '',
+    amount: 0,
+    currency: 'USD',
     comments: '',
     documents: {
       commercial: [],
@@ -124,6 +127,9 @@ const handleSubmit = async (e) => {
         portal_url: formData.portalUrl || '',
         question_submission_date: formData.questionSubmissionDate ? new Date(formData.questionSubmissionDate).toISOString() : null,
         response_submission_date: formData.responseSubmissionDate ? new Date(formData.responseSubmissionDate).toISOString() : null,
+        response_submitted_date: formData.responseSubmittedDate ? new Date(formData.responseSubmittedDate).toISOString() : null,
+        amount: parseFloat(formData.amount) || 0,
+        currency: formData.currency || 'USD',
         comments: formData.comments || '',
         opportunity_id: rfpData.opportunityId || null,
         rfpDocuments: []
@@ -146,6 +152,9 @@ const handleSubmit = async (e) => {
           portalUrl: response.data.portal_url,
           questionSubmissionDate: response.data.question_submission_date,
           responseSubmissionDate: response.data.response_submission_date,
+          responseSubmittedDate: response.data.response_submitted_date,
+          amount: response.data.amount || 0,
+          currency: response.data.currency || 'USD',
           comments: response.data.comments
         };
 
@@ -242,8 +251,8 @@ const handleSubmit = async (e) => {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="space-y-6">
-                      {/* First Row - Type and Status Side by Side */}
-                      <div className="grid grid-cols-2 gap-4">
+                      {/* First Row - Type and Status */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* RFP Type */}
                         <div>
                           <Label className="text-sm font-medium text-gray-700">Type</Label>
@@ -254,6 +263,71 @@ const handleSubmit = async (e) => {
                         <div>
                           <Label className="text-sm font-medium text-gray-700">Status</Label>
                           {renderSelectField('Status', formData.rfpStatus, 'rfpStatus', RFP_STATUSES)}
+                        </div>
+                      </div>
+
+                      {/* Second Row - RFP Title */}
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">RFP Title</Label>
+                        {mode === 'edit' ? (
+                          <Input
+                            value={formData.rfpTitle}
+                            onChange={(e) => handleInputChange('rfpTitle', e.target.value)}
+                            className="w-full mt-1"
+                            placeholder="Enter RFP title"
+                          />
+                        ) : (
+                          <div className="p-2 bg-gray-50 rounded border border-gray-200 text-sm">
+                            {formData.rfpTitle || 'Not specified'}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Third Row - Amount and Currency */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Amount */}
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700">Amount</Label>
+                          {mode === 'edit' ? (
+                            <Input
+                              type="number"
+                              value={formData.amount}
+                              onChange={(e) => handleInputChange('amount', e.target.value)}
+                              className="w-full mt-1"
+                              step="0.01"
+                              min="0"
+                            />
+                          ) : (
+                            <div className="p-2 bg-gray-50 rounded border border-gray-200 text-sm">
+                              {formData.amount ? parseFloat(formData.amount).toLocaleString() : 'Not specified'}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Currency */}
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700">Currency</Label>
+                          {mode === 'edit' ? (
+                            <Select
+                              value={formData.currency || 'USD'}
+                              onValueChange={(value) => handleInputChange('currency', value)}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select currency" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="USD">USD ($)</SelectItem>
+                                <SelectItem value="EUR">EUR (€)</SelectItem>
+                                <SelectItem value="GBP">GBP (£)</SelectItem>
+                                <SelectItem value="INR">INR (₹)</SelectItem>
+                                <SelectItem value="AED">AED (د.إ)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <div className="p-2 bg-gray-50 rounded border border-gray-200 text-sm">
+                              {formData.currency || 'USD'}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -357,6 +431,26 @@ const handleSubmit = async (e) => {
                               </div>
                             </div>
                             
+                            <div>
+                              <Label className="text-sm font-medium text-gray-700">Response Submitted Date</Label>
+                              {mode === 'edit' ? (
+                                <Input
+                                  type="date"
+                                  value={formData.responseSubmittedDate ? formatDateForDisplay(formData.responseSubmittedDate) : ''}
+                                  onChange={(e) => handleInputChange('responseSubmittedDate', e.target.value)}
+                                  className="w-full mt-1"
+                                />
+                              ) : (
+                                <div className="p-2 bg-gray-50 rounded border border-gray-200 text-sm">
+                                  {formData.responseSubmittedDate ? formatDateForDisplay(formData.responseSubmittedDate) : 'Not specified'}
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="grid grid-cols-1 gap-4 mt-4">
+                            </div>
+                            
+
                             <div>
                               <Label className="text-sm font-medium text-gray-700">Comments</Label>
                               {renderField('Comments', formData.comments, 'comments', true)}

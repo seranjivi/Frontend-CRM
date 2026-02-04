@@ -180,6 +180,7 @@ const RFPDetails = () => {
         
         const formattedData = responseData.map(item => ({
           id: item.id,
+          clientName: item.clientName || item.opportunity?.client_name || 'N/A',
           opportunityName: item.opportunityName || 'N/A',
           rfpTitle: item.rfpTitle || 'N/A',
           rfpStatus: item.rfpStatus || 'Draft',
@@ -203,9 +204,13 @@ const RFPDetails = () => {
 
   // Table columns configuration
   const columns = [
+    // {
+    //   key: 'opportunityName',
+    //   header: 'Opportunity Name',
+    // },
     {
-      key: 'opportunityName',
-      header: 'Opportunity Name',
+      key: 'clientName',
+      header: 'Client Name',
     },
     {
       key: 'rfpTitle',

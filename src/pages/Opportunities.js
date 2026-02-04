@@ -360,41 +360,41 @@ const Opportunities = () => {
         );
       },
     },
-    {
-      key: 'approval_stage',
-      header: 'Approval Stage',
-      headerClassName: 'text-[18px] font-medium',
-      hidden: true, // Hide the old status column as requested
-      render: (value) => {
-        const stageColors = {
-          'Draft': 'bg-blue-100 text-blue-800',
-          'Pending Approval': 'bg-yellow-100 text-yellow-800',
-          'Approved': 'bg-green-100 text-green-800',
-          'Rejected': 'bg-red-100 text-red-800',
-          'In Review': 'bg-purple-100 text-purple-800',
-          'Level 1 Approval - RFB': 'bg-gray-100 text-gray-800'
-        };
+    // {
+    //   key: 'approval_stage',
+    //   header: 'Approval Stage',
+    //   headerClassName: 'text-[18px] font-medium',
+    //   hidden: true, // Hide the old status column as requested
+    //   render: (value) => {
+    //     const stageColors = {
+    //       'Draft': 'bg-blue-100 text-blue-800',
+    //       'Pending Approval': 'bg-yellow-100 text-yellow-800',
+    //       'Approved': 'bg-green-100 text-green-800',
+    //       'Rejected': 'bg-red-100 text-red-800',
+    //       'In Review': 'bg-purple-100 text-purple-800',
+    //       'Level 1 Approval - RFB': 'bg-gray-100 text-gray-800'
+    //     };
 
-        return (
-          <span
-            className={`px-2 py-1 rounded-full text-xs font-medium ${stageColors[value] || 'bg-gray-100 text-gray-800'
-              }`}
-          >
-            {value || '-'}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'amount',
-      header: 'Amount',
-      headerClassName: 'text-[18px] font-medium',
-      render: (value, row) => (
-        <span className="font-medium text-sm">
-          {row.currency || 'USD'} {(value || 0).toLocaleString()}
-        </span>
-      ),
-    },
+    //     return (
+    //       <span
+    //         className={`px-2 py-1 rounded-full text-xs font-medium ${stageColors[value] || 'bg-gray-100 text-gray-800'
+    //           }`}
+    //       >
+    //         {value || '-'}
+    //       </span>
+    //     );
+    //   },
+    // },
+    // {
+    //   key: 'amount',
+    //   header: 'Amount',
+    //   headerClassName: 'text-[18px] font-medium',
+    //   render: (value, row) => (
+    //     <span className="font-medium text-sm">
+    //       {row.currency || 'USD'} {(value || 0).toLocaleString()}
+    //     </span>
+    //   ),
+    // },
     {
       key: 'close_date',
       header: 'End Date',
