@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Use environment variable or fallback to the deployed backend URL
-const API_URL = process.env.REACT_APP_API_URL || 'https://backend-crm-4.onrender.com/api';
+const API_URL = process.env.REACT_APP_API_URL || 'https://backend-crm-2-l5en.onrender.com/api';
 const api = axios.create({
   baseURL: API_URL,
   withCredentials: true,
