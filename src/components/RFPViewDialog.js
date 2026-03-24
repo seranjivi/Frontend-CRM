@@ -41,6 +41,7 @@ const RFPViewDialog = ({
     bidManager: '',
     submissionMode: 'Email',
     portalUrl: 'https://',
+    nextstep: '',
     questionSubmissionDate: '',
     responseSubmissionDate: '',
     responseSubmittedDate: '',
@@ -125,6 +126,7 @@ const handleSubmit = async (e) => {
         bid_manager: formData.bidManager || '',
         submission_mode: formData.submissionMode || 'Email',
         portal_url: formData.portalUrl || '',
+        nextstep: formData.nextstep || '',
         question_submission_date: formData.questionSubmissionDate ? new Date(formData.questionSubmissionDate).toISOString() : null,
         response_submission_date: formData.responseSubmissionDate ? new Date(formData.responseSubmissionDate).toISOString() : null,
         response_submitted_date: formData.responseSubmittedDate ? new Date(formData.responseSubmittedDate).toISOString() : null,
@@ -150,6 +152,7 @@ const handleSubmit = async (e) => {
           rfpManager: response.data.bid_manager,
           submissionMode: response.data.submission_mode,
           portalUrl: response.data.portal_url,
+          nextstep: response.data.nextstep,
           questionSubmissionDate: response.data.question_submission_date,
           responseSubmissionDate: response.data.response_submission_date,
           responseSubmittedDate: response.data.response_submitted_date,
@@ -321,6 +324,8 @@ const handleSubmit = async (e) => {
                                 <SelectItem value="GBP">GBP (£)</SelectItem>
                                 <SelectItem value="INR">INR (₹)</SelectItem>
                                 <SelectItem value="AED">AED (د.إ)</SelectItem>
+                                <SelectItem value="QAR">QAR (ر.ق)</SelectItem>
+                                <SelectItem value="SAR">SAR (ر.س)</SelectItem>
                               </SelectContent>
                             </Select>
                           ) : (
@@ -381,6 +386,12 @@ const handleSubmit = async (e) => {
                         <div className="space-y-1">
                           <Label className="block text-sm font-medium text-gray-700">Portal URL</Label>
                           {renderField('Portal URL', formData.portalUrl, 'portalUrl')}
+                        </div>
+
+                        {/* Next Step */}
+                        <div className="space-y-1">
+                          <Label className="block text-sm font-medium text-gray-700">Next Step</Label>
+                          {renderField('Next Step', formData.nextstep, 'nextstep')}
                         </div>
                       </div>
 

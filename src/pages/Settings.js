@@ -283,6 +283,9 @@ const Settings = () => {
                   <SelectItem value="INR">INR - Indian Rupee</SelectItem>
                   <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
                   <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
+                  <SelectItem value="AED">AED - UAE Dirham</SelectItem>
+                  <SelectItem value="QAR">QAR - Qatari Riyal</SelectItem>
+                  <SelectItem value="SAR">SAR - Saudi Riyal</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-slate-500 mt-1">

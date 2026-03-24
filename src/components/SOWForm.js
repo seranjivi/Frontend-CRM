@@ -218,6 +218,9 @@ const SOWForm = ({ sow, onClose }) => {
               <SelectItem value="EUR">EUR</SelectItem>
               <SelectItem value="GBP">GBP</SelectItem>
               <SelectItem value="INR">INR</SelectItem>
+              <SelectItem value="AED">AED</SelectItem>
+              <SelectItem value="QAR">QAR</SelectItem>
+              <SelectItem value="SAR">SAR</SelectItem>
             </SelectContent>
           </Select>
         </div>

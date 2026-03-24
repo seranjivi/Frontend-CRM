@@ -77,7 +77,9 @@ const [selectedFiles, setSelectedFiles] = useState([]);
     { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
     { code: 'EUR', symbol: '€', name: 'Euro' },
     { code: 'GBP', symbol: '£', name: 'British Pound' },
-    { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' }
+    { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' },
+    { code: 'QAR', symbol: 'ر.ق', name: 'Qatari Riyal' },
+    { code: 'SAR', symbol: 'ر.س', name: 'Saudi Riyal' }
   ];
 
 const OPPORTUNITY_TYPES = [
@@ -182,6 +184,7 @@ const PIPELINE_STATUSES = [
       bidManager: '',
       submissionMode: '',
       portalUrl: '',
+      nextstep: '',
       questionSubmissionDate: '',
       responseSubmissionDate: '',
       responseSubmittedDate: '',
@@ -455,6 +458,7 @@ const PIPELINE_STATUSES = [
           bidManager: opportunity.bid_manager || opportunity.rfpDetails?.bidManager || '',
           submissionMode: opportunity.submission_mode || opportunity.rfpDetails?.submissionMode || '',
           portalUrl: opportunity.portal_url || opportunity.rfpDetails?.portalUrl || '',
+          nextstep: opportunity.nextstep || opportunity.rfpDetails?.nextstep || '',
           questionSubmissionDate: opportunity.question_submission_date || opportunity.rfpDetails?.questionSubmissionDate || '',
           responseSubmissionDate: opportunity.response_submission_date || opportunity.rfpDetails?.responseSubmissionDate || '',
           responseSubmittedDate: opportunity.responseSubmittedDate || opportunity.rfpDetails?.responseSubmittedDate || '',
@@ -634,6 +638,7 @@ const PIPELINE_STATUSES = [
           bid_manager: formData.rfpDetails?.bidManager || formData.opportunity.assignedTo || '',
           submission_mode: formData.rfpDetails?.submissionMode || 'paid',
           portal_url: formData.rfpDetails?.portalUrl || '',
+          nextstep: formData.rfpDetails?.nextstep || '',
           question_submission_date: formData.rfpDetails?.questionSubmissionDate || null,
           response_submission_date: formData.rfpDetails?.responseSubmissionDate || null,
           response_submitted_date: formData.rfpDetails?.responseSubmittedDate || null,
@@ -1720,6 +1725,18 @@ const PIPELINE_STATUSES = [
                       value={formData.rfpDetails.portalUrl}
                       onChange={(e) => updateRfpDetails('portalUrl', e.target.value)}
                       placeholder="https://"
+                    />
+                  </div>
+
+                  {/* Next Step */}
+                  <div>
+                    <Label htmlFor="nextstep">Next Step</Label>
+                    <Input
+                      id="nextstep"
+                      type="text"
+                      value={formData.rfpDetails.nextstep}
+                      onChange={(e) => updateRfpDetails('nextstep', e.target.value)}
+                      placeholder="Enter next step..."
                     />
                   </div>
 
