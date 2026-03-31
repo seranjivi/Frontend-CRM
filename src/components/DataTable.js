@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Search, ChevronLeft, ChevronRight, Download, Filter, Edit2, Trash2, FilterX, Eye, Plus, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import ColumnFilter from './ColumnFilter';
-//
 
 const DataTable = ({
   data = [],
@@ -29,6 +28,8 @@ const DataTable = ({
   deleteButtonClass = 'h-8 w-8 p-0 text-red-600 hover:text-red-800',
   title = 'Data Table'
 }) => {
+  console.log('DataTable received data:', data);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -141,9 +142,9 @@ const DataTable = ({
           <TableBody>
             {paginatedData.length > 0 ? (
               paginatedData.map((item, rowIndex) => (
-                <TableRow key={rowIndex}>
+                <TableRow key={item.id || rowIndex}>
                   {columns.map((column) => (
-                    <TableCell key={`${rowIndex}-${column.key}`}>
+                    <TableCell key={`${item.id || rowIndex}-${column.key}`}>
                       {column.render
                         ? column.render(item[column.key], item)
                         : item[column.key]}

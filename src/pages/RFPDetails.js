@@ -36,18 +36,39 @@ const RFPDetails = () => {
 
   // Handle successful RFP save/update
   const handleRFPSuccess = (updatedRFP) => {
-  // Update the local state with the updated RFP
-  setData(prevData => 
-    prevData.map(item => 
-      item.id === updatedRFP.id ? { ...item, ...updatedRFP } : item
-    )
-  );
-  // Close the dialog and reset
-  setViewRFPDialogOpen(false);
-  setSelectedRFP(null);
-  setViewMode('view');
-  toast.success('RFP updated successfully');
-};
+    
+    // Update the local state with the updated RFP
+    setData(prevData => {
+      const updatedData = prevData.map(item => {
+        if (item.id === updatedRFP.id) {
+          
+          // Merge the updated data with existing item, ensuring proper field mapping
+          const newItem = {
+            ...item,
+            id: updatedRFP.id,
+            clientName: updatedRFP.clientName || item.clientName,
+            opportunityName: updatedRFP.opportunityName || item.opportunityName,
+            rfpTitle: updatedRFP.rfpTitle || updatedRFP.title || item.rfpTitle,
+            rfpStatus: updatedRFP.status || updatedRFP.rfpStatus || updatedRFP.rfp_status || item.rfpStatus, // Fixed: use 'status' field
+            rfpManager: updatedRFP.rfpManager || updatedRFP.bid_manager || item.rfpManager,
+            submissionDeadline: updatedRFP.submissionDeadline || updatedRFP.submission_deadline || item.submissionDeadline,
+            createdOn: updatedRFP.createdOn || item.createdOn
+          };
+          
+          return newItem;
+        }
+        return item;
+      });
+      
+      return updatedData;
+    });
+    
+    // Close the dialog and reset
+    setViewRFPDialogOpen(false);
+    setSelectedRFP(null);
+    setViewMode('view');
+    toast.success('RFP updated successfully');
+  };
 
   const [newRFP, setNewRFP] = useState({
     opportunityName: '',
@@ -223,7 +244,12 @@ const RFPDetails = () => {
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
           value === 'Draft' ? 'bg-yellow-100 text-yellow-800' :
           value === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-          'bg-green-100 text-green-800'
+          value === 'Submitted' ? 'bg-green-100 text-green-800' : // Changed to green
+          value === 'Won' ? 'bg-emerald-100 text-emerald-800' : // Different green for Won
+          value === 'Lost' ? 'bg-red-100 text-red-800' :
+          value === 'Withdrawn' ? 'bg-gray-100 text-gray-800' :
+          value === 'Cancelled' ? 'bg-orange-100 text-orange-800' :
+          'bg-gray-100 text-gray-800'
         }`}>
           {value}
         </span>
@@ -542,6 +568,7 @@ const RFPDetails = () => {
 
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <DataTable
+          key={JSON.stringify(data.map(item => ({ id: item.id, rfpStatus: item.rfpStatus, rfpTitle: item.rfpTitle })))} // Force re-render when key data changes
           data={data}
           columns={columns}
           customActions={customActions}
