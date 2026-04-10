@@ -56,7 +56,7 @@ const Layout = ({ children }) => {
         { name: 'All Leads', href: '/opportunities' },
         { name: 'Opportunity-RFP', href: '/rfp-details' },
         { name: 'SOW Details', href: '/sows', icon: FileText },
-        { name: 'Opportunity Management', href: '/opportunity-management', icon: BarChart }
+        { name: 'Marketing', href: '/opportunity-management', icon: BarChart }
       ]
     },
     {
