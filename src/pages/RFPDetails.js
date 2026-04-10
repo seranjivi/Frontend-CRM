@@ -27,21 +27,52 @@ import OpportunityFormTabbed from '../components/OpportunityFormTabbed';
 
 const RFPDetails = () => {
   const [data, setData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAddRFPDialogOpen, setIsAddRFPDialogOpen] = useState(false);
   const [viewRFPDialogOpen, setViewRFPDialogOpen] = useState(false);
   const [selectedRFP, setSelectedRFP] = useState(null);
   const [viewMode, setViewMode] = useState('view'); // 'view' or 'edit'
+  const [activeFilters, setActiveFilters] = useState([]);
+
+  const handleColumnFilterChange = (columnKey, values) => {
+    setActiveFilters(prev => {
+      // Remove existing filter for this column if any
+      const filtered = prev.filter(f => f.column !== columnKey);
+      // Add new filter if values are provided
+      if (values && values.length > 0) {
+        return [...filtered, { column: columnKey, values }];
+      }
+      return filtered;
+    });
+  };
+
+  // Apply column filters to data
+  useEffect(() => {
+    if (activeFilters.length === 0) {
+      setFilteredData(data);
+      return;
+    }
+
+    const filtered = data.filter(item => {
+      return activeFilters.every(filter => {
+        const value = item[filter.column];
+        return filter.values.includes(value);
+      });
+    });
+
+    setFilteredData(filtered);
+  }, [data, activeFilters]);
 
   // Handle successful RFP save/update
   const handleRFPSuccess = (updatedRFP) => {
-    
+
     // Update the local state with the updated RFP
     setData(prevData => {
       const updatedData = prevData.map(item => {
         if (item.id === updatedRFP.id) {
-          
+
           // Merge the updated data with existing item, ensuring proper field mapping
           const newItem = {
             ...item,
@@ -52,17 +83,43 @@ const RFPDetails = () => {
             rfpStatus: updatedRFP.status || updatedRFP.rfpStatus || updatedRFP.rfp_status || item.rfpStatus, // Fixed: use 'status' field
             rfpManager: updatedRFP.rfpManager || updatedRFP.bid_manager || item.rfpManager,
             submissionDeadline: updatedRFP.submissionDeadline || updatedRFP.submission_deadline || item.submissionDeadline,
-            createdOn: updatedRFP.createdOn || item.createdOn
+            createdOn: updatedRFP.createdOn || item.createdOn,
+            currency: updatedRFP.currency || item.currency || 'USD',
+            amount: updatedRFP.amount || item.amount || 0
           };
-          
+
           return newItem;
         }
         return item;
       });
-      
+
       return updatedData;
     });
-    
+
+    // Update filteredData as well
+    setFilteredData(prevData => {
+      const updatedData = prevData.map(item => {
+        if (item.id === updatedRFP.id) {
+          const newItem = {
+            ...item,
+            id: updatedRFP.id,
+            clientName: updatedRFP.clientName || item.clientName,
+            opportunityName: updatedRFP.opportunityName || item.opportunityName,
+            rfpTitle: updatedRFP.rfpTitle || updatedRFP.title || item.rfpTitle,
+            rfpStatus: updatedRFP.status || updatedRFP.rfpStatus || updatedRFP.rfp_status || item.rfpStatus,
+            rfpManager: updatedRFP.rfpManager || updatedRFP.bid_manager || item.rfpManager,
+            submissionDeadline: updatedRFP.submissionDeadline || updatedRFP.submission_deadline || item.submissionDeadline,
+            createdOn: updatedRFP.createdOn || item.createdOn,
+            currency: updatedRFP.currency || item.currency || 'USD',
+            amount: updatedRFP.amount || item.amount || 0
+          };
+          return newItem;
+        }
+        return item;
+      });
+      return updatedData;
+    });
+
     // Close the dialog and reset
     setViewRFPDialogOpen(false);
     setSelectedRFP(null);
@@ -201,16 +258,20 @@ const RFPDetails = () => {
         
         const formattedData = responseData.map(item => ({
           id: item.id,
+          opportunityId: item.opportunity?.id || item.opportunityId || 'N/A',
           clientName: item.clientName || item.opportunity?.client_name || 'N/A',
           opportunityName: item.opportunityName || 'N/A',
           rfpTitle: item.rfpTitle || 'N/A',
           rfpStatus: item.rfpStatus || 'Draft',
           rfpManager: item.rfpManager || 'N/A',
           submissionDeadline: item.submissionDeadline || 'N/A',
-          createdOn: item.createdOn || new Date().toISOString().split('T')[0]
+          createdOn: item.createdOn || new Date().toISOString().split('T')[0],
+          currency: item.currency || 'USD',
+          amount: item.amount || 0
         }));
         
         setData(formattedData);
+        setFilteredData(formattedData);
       } catch (err) {
         console.error('Error fetching RFPs:', err);
         setError('Failed to load RFP data. Please try again later.');
@@ -230,8 +291,13 @@ const RFPDetails = () => {
     //   header: 'Opportunity Name',
     // },
     {
+      key: 'opportunityId',
+      header: 'Opportunity ID',
+    },
+    {
       key: 'clientName',
       header: 'Client Name',
+      filterable: true,
     },
     {
       key: 'rfpTitle',
@@ -252,6 +318,24 @@ const RFPDetails = () => {
           'bg-gray-100 text-gray-800'
         }`}>
           {value}
+        </span>
+      )
+    },
+    {
+      key: 'currency',
+      header: 'Currency',
+      render: (value) => (
+        <span className="text-sm">
+          {value || 'USD'}
+        </span>
+      )
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      render: (value) => (
+        <span className="text-sm">
+          {value !== null && value !== undefined ? value.toLocaleString() : 'N/A'}
         </span>
       )
     },
@@ -550,7 +634,7 @@ const RFPDetails = () => {
         <div className="flex items-center space-x-4">
           <Button 
             variant="outline" 
-            className="h-9 text-gray-700 border-gray-300"
+            className="h-9 text-gray-70s0 border-gray-300"
             onClick={handleExportData}
           >
             <Download className="mr-2 h-4 w-4" />
@@ -568,10 +652,12 @@ const RFPDetails = () => {
 
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <DataTable
-          key={JSON.stringify(data.map(item => ({ id: item.id, rfpStatus: item.rfpStatus, rfpTitle: item.rfpTitle })))} // Force re-render when key data changes
-          data={data}
+          key={JSON.stringify(filteredData.map(item => ({ id: item.id, rfpStatus: item.rfpStatus, rfpTitle: item.rfpTitle })))} // Force re-render when key data changes
+          data={filteredData}
           columns={columns}
           customActions={customActions}
+          onFilterChange={handleColumnFilterChange}
+          activeFilters={activeFilters || []}
         />
       </div>
       <AddRFPDialog />

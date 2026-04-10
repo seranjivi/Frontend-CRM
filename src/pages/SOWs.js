@@ -28,6 +28,8 @@ const SOWs = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredSOWs, setFilteredSOWs] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [activeFilters, setActiveFilters] = useState([]);
 
   useEffect(() => {
     const fetchSOWs = async () => {
@@ -37,6 +39,7 @@ const SOWs = () => {
         // Map the API response to match the table's expected format
         const formattedSOWs = response.data.map(sow => ({
           id: `SOW-${sow.sow_id}`,
+          opportunityId: sow.opportunity?.id || sow.opportunity_id || 'N/A',
           title: sow.sow_title,
           client: sow.client_name || '-', // Using client_name from the API response
           status: sow.sow_status,
@@ -48,6 +51,7 @@ const SOWs = () => {
         }));
         setSOWs(formattedSOWs);
         setFilteredSOWs(formattedSOWs);
+        setFilteredData(formattedSOWs);
       } catch (error) {
         console.error('Error fetching SOWs:', error);
         toast.error('Failed to load SOWs');
@@ -80,6 +84,34 @@ const SOWs = () => {
       [filterType]: value
     }));
   };
+
+  const handleColumnFilterChange = (columnKey, values) => {
+    setActiveFilters(prev => {
+      // Remove existing filter for this column if any
+      const filtered = prev.filter(f => f.column !== columnKey);
+      // Add new filter if values are provided
+      if (values && values.length > 0) {
+        return [...filtered, { column: columnKey, values }];
+      }
+      return filtered;
+    });
+  };
+
+  useEffect(() => {
+    if (activeFilters.length === 0) {
+      setFilteredData(filteredSOWs);
+      return;
+    }
+
+    const filtered = filteredSOWs.filter(item => {
+      return activeFilters.every(filter => {
+        const value = item[filter.column];
+        return filter.values.includes(value);
+      });
+    });
+
+    setFilteredData(filtered);
+  }, [filteredSOWs, activeFilters]);
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -201,6 +233,7 @@ const SOWs = () => {
       // Prepare the data to be sent to the API
       const updateData = {
         sow_id: numericId,
+        opportunityId: viewingSOW.opportunityId,
         sow_title: viewingSOW.sow_title,
         sow_status: viewingSOW.sow_status,
         client_name: viewingSOW.client_name,
@@ -221,6 +254,7 @@ const SOWs = () => {
       const response = await sowService.getSOWs();
       const formattedSOWs = response.data.map(sow => ({
         id: `SOW-${sow.sow_id}`,
+        opportunityId: sow.opportunity?.id || sow.opportunity_id || 'N/A',
         title: sow.sow_title,
         client: sow.client_name || '-',
         status: sow.sow_status,
@@ -231,6 +265,7 @@ const SOWs = () => {
       }));
       setSOWs(formattedSOWs);
       setFilteredSOWs(formattedSOWs);
+      setFilteredData(formattedSOWs);
     } catch (error) {
       console.error('Error updating SOW:', error);
       toast.error('Failed to update SOW');
@@ -278,6 +313,7 @@ const SOWs = () => {
         // Update local state instead of refetching
         setSOWs(prev => prev.filter(s => s.id !== sow.id));
         setFilteredSOWs(prev => prev.filter(s => s.id !== sow.id));
+        setFilteredData(prev => prev.filter(s => s.id !== sow.id));
         setIsViewDialogOpen(false);
         toast.success('SOW deleted successfully');
       } catch (error) {
@@ -291,6 +327,10 @@ const SOWs = () => {
 
   const columns = [
     {
+      key: 'opportunityId',
+      header: 'Opportunity ID',
+    },
+    {
       key: 'title',
       header: 'SOW Title',
       render: (_, row) => (
@@ -302,7 +342,7 @@ const SOWs = () => {
         </div>
       ),
     },
-    { key: 'client', header: 'Client' },
+    { key: 'client', header: 'Client', filterable: true },
     {
       key: 'status',
       header: 'Status',
@@ -412,9 +452,11 @@ const SOWs = () => {
       </div>
 
       <DataTable
-        data={filteredSOWs}
+        data={filteredData}
         columns={columns}
         customActions={customActions}
+        onFilterChange={handleColumnFilterChange}
+        activeFilters={activeFilters || []}
         onExport={() => {
           // Handle export logic here
           toast.success('Exporting SOWs...');
