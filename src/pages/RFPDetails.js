@@ -659,7 +659,7 @@ const RFPDetails = () => {
               {loading ? 'Loading...' : `(${data.length} ${data.length === 1 ? 'record' : 'records'})`}
             </span>
           </div>
-          <p className="text-sm text-gray-500">Procurement and Submission Trackingg</p>
+          <p className="text-sm text-gray-500">Procurement and Submission Tracking</p>
         </div>
         <div className="flex items-center space-x-4">
           <Button 

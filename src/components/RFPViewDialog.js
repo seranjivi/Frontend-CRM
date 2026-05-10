@@ -306,7 +306,7 @@ const handleSubmit = async (e) => {
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Opportunity-RFP Detailst</CardTitle>
+                    <CardTitle className="text-lg">Opportunity-RFP Details</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="space-y-6">
