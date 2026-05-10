@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from './ui/select';
 import { toast } from 'sonner';
+import DateField from './DateField';
 
 const RFPViewDialog = ({ 
   open, 
@@ -47,6 +48,9 @@ const RFPViewDialog = ({
     responseSubmittedDate: '',
     amount: 0,
     currency: 'USD',
+    expectedStartDate: '',
+    probabilityOfWinning: '',
+    projectDuration: '',
     comments: '',
     documents: {
       commercial: [],
@@ -65,6 +69,13 @@ const RFPViewDialog = ({
       const updatedData = {
         ...rfpData,
         rfpDescription: rfpData.rfpDescription || rfpData.rfbDescription || '',
+        bidManager: rfpData.bid_manager || rfpData.bidManager || '',
+        submissionMode: rfpData.submission_mode || rfpData.submissionMode || 'Email',
+        portalUrl: rfpData.portal_url || rfpData.portalUrl || '',
+        nextstep: rfpData.nextstep || rfpData.nextStep || '',
+        expectedStartDate: rfpData.expected_start_date || rfpData.expectedStartDate || '',
+        probabilityOfWinning: rfpData.probability_of_winning || rfpData.probabilityOfWinning || '',
+        projectDuration: rfpData.project_duration || rfpData.projectDuration || '',
         documents: {
           commercial: rfpData.documents?.commercial || [],
           proposal: rfpData.documents?.proposal || [],
@@ -93,6 +104,18 @@ const RFPViewDialog = ({
     }
   };
 
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      return date.toISOString().split('T')[0];
+    } catch (e) {
+      console.error('Error formatting date for input:', e);
+      return '';
+    }
+  };
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -112,8 +135,19 @@ const RFPViewDialog = ({
 
 const handleSubmit = async (e) => {
   e.preventDefault();
+  alert('handleSubmit function called!');
   try {
     if (mode === 'edit' && rfpData?.id) {
+      // Debug: Log form data values and check if they exist
+      console.log('Form data before API call:', {
+        expectedStartDate: formData.expectedStartDate,
+        probabilityOfWinning: formData.probabilityOfWinning,
+        projectDuration: formData.projectDuration,
+        hasExpectedStart: !!formData.expectedStartDate,
+        hasProbability: !!formData.probabilityOfWinning,
+        hasProjectDuration: !!formData.projectDuration
+      });
+      
       // Format the data according to the required API payload structure
       const payload = {
         opportunityName: formData.opportunityName || '',
@@ -132,10 +166,16 @@ const handleSubmit = async (e) => {
         response_submitted_date: formData.responseSubmittedDate ? new Date(formData.responseSubmittedDate).toISOString() : null,
         amount: parseFloat(formData.amount) || 0,
         currency: formData.currency || 'USD',
+        expected_start_date: formData.expectedStartDate ? new Date(formData.expectedStartDate).toISOString() : null,
+        probability_of_winning: formData.probabilityOfWinning ? parseFloat(formData.probabilityOfWinning) : null,
+        project_duration: formData.projectDuration ? parseInt(formData.projectDuration) : null,
         comments: formData.comments || '',
         opportunity_id: rfpData.opportunityId || null,
         rfpDocuments: []
       };
+      
+      // Debug: Log the complete payload
+      console.log('Complete API payload:', payload);
 
       // Call the updateRFP API with the formatted payload
       const response = await rfpService.updateRFP(rfpData.id, payload);
@@ -158,6 +198,9 @@ const handleSubmit = async (e) => {
           responseSubmittedDate: response.data.response_submitted_date,
           amount: response.data.amount || 0,
           currency: response.data.currency || 'USD',
+          expectedStartDate: response.data.expectedStartDate,
+          probabilityOfWinning: response.data.probabilityOfWinning,
+          projectDuration: response.data.projectDuration,
           comments: response.data.comments
         };
 
@@ -222,6 +265,18 @@ const handleSubmit = async (e) => {
     'Draft', 'In Progress', 'Submitted', 'Won', 'Lost', 'Withdrawn', 'Cancelled'
   ];
 
+  const formatProjectDuration = (duration) => {
+    if (!duration) return '';
+    const num = parseInt(duration);
+    if (isNaN(num)) return duration; // Return as is if not a number
+
+    if (num === 1) return '1 Month';
+    if (num > 1 && num < 12) return `${num} Months`;
+    if (num === 12) return '12 Months (1 Year)';
+    if (num === 24) return '24 Months';
+    return duration; // Fallback
+  };
+
   const documentSections = [
     { key: 'commercial', label: 'Commercial' },
     { key: 'proposal', label: 'Proposal' },
@@ -239,6 +294,7 @@ const handleSubmit = async (e) => {
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
+          {console.log('Form rendered, mode:', mode, 'rfpData:', rfpData)}
           <Tabs defaultValue="opportunity-rfp" className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-4">
               <TabsTrigger value="details" disabled>Details</TabsTrigger>
@@ -250,7 +306,7 @@ const handleSubmit = async (e) => {
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Opportunity-RFP Details</CardTitle>
+                    <CardTitle className="text-lg">Opportunity-RFP Detailst</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="space-y-6">
@@ -359,7 +415,7 @@ const handleSubmit = async (e) => {
                           {mode === 'edit' ? (
                             <Input
                               type="date"
-                              value={formData.submissionDeadline ? formatDateForDisplay(formData.submissionDeadline) : ''}
+                              value={formData.submissionDeadline ? formatDateForInput(formData.submissionDeadline) : ''}
                               onChange={(e) => handleInputChange('submissionDeadline', e.target.value)}
                               className="w-full mt-1"
                             />
@@ -392,6 +448,84 @@ const handleSubmit = async (e) => {
                         <div className="space-y-1">
                           <Label className="block text-sm font-medium text-gray-700">Next Step</Label>
                           {renderField('Next Step', formData.nextstep, 'nextstep')}
+                        </div>
+
+                        {/* Expected Start Date */}
+                        <div className="space-y-1">
+                          <Label className="block text-sm font-medium text-gray-700">Expected Start Date</Label>
+                          {mode === 'edit' ? (
+                            <Input
+                              type="date"
+                              value={formData.expectedStartDate ? formatDateForInput(formData.expectedStartDate) : ''}
+                              onChange={(e) => handleInputChange('expectedStartDate', e.target.value)}
+                              min={new Date().toISOString().split('T')[0]}
+                              className="w-full mt-1"
+                            />
+                          ) : (
+                            <div className="mt-1 p-2 bg-gray-50 rounded border border-gray-200 text-sm min-h-[40px]">
+                              {formData.expectedStartDate ? formatDateForDisplay(formData.expectedStartDate) : 'Not specified'}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Probability of Winning */}
+                        <div className="space-y-1">
+                          <Label className="block text-sm font-medium text-gray-700">Probability of Winning (%)</Label>
+                          {mode === 'edit' ? (
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={formData.probabilityOfWinning}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Allow values between 0-100 only
+                                if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 100)) {
+                                  handleInputChange('probabilityOfWinning', value);
+                                }
+                              }}
+                              className="w-full mt-1"
+                              placeholder="Enter probability percentage (0-100)"
+                            />
+                          ) : (
+                            <div className="mt-1 p-2 bg-gray-50 rounded border border-gray-200 text-sm">
+                              {formData.probabilityOfWinning || 'Not specified'}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Project Duration */}
+                        <div className="space-y-1">
+                          <Label className="block text-sm font-medium text-gray-700">Project Duration</Label>
+                          {mode === 'edit' ? (
+                            <Select
+                              value={formatProjectDuration(formData.projectDuration)}
+                              onValueChange={(value) => handleInputChange('projectDuration', value)}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select project duration" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1 Month">1 Month</SelectItem>
+                                <SelectItem value="2 Months">2 Months</SelectItem>
+                                <SelectItem value="3 Months">3 Months</SelectItem>
+                                <SelectItem value="4 Months">4 Months</SelectItem>
+                                <SelectItem value="5 Months">5 Months</SelectItem>
+                                <SelectItem value="6 Months">6 Months</SelectItem>
+                                <SelectItem value="7 Months">7 Months</SelectItem>
+                                <SelectItem value="8 Months">8 Months</SelectItem>
+                                <SelectItem value="9 Months">9 Months</SelectItem>
+                                <SelectItem value="10 Months">10 Months</SelectItem>
+                                <SelectItem value="11 Months">11 Months</SelectItem>
+                                <SelectItem value="12 Months (1 Year)">12 Months (1 Year)</SelectItem>
+                                <SelectItem value="24 Months">24 Months</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <div className="mt-1 p-2 bg-gray-50 rounded border border-gray-200 text-sm">
+                              {formatProjectDuration(formData.projectDuration) || 'Not specified'}
+                            </div>
+                          )}
                         </div>
                       </div>
 

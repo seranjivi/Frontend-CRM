@@ -188,6 +188,9 @@ const PIPELINE_STATUSES = [
       questionSubmissionDate: '',
       responseSubmissionDate: '',
       responseSubmittedDate: '',
+      expectedStartDate: '',
+      probabilityOfWinning: '',
+      projectDuration: '',
       comments: '',
       qaLogs: []
     },
@@ -645,6 +648,9 @@ const PIPELINE_STATUSES = [
           comments: formData.rfpDetails?.comments || '',
           amount: parseFloat(formData.rfpDetails?.amount) || 0,
           currency: formData.rfpDetails?.currency || 'USD',
+          expected_start_date: formData.rfpDetails?.expectedStartDate ? new Date(formData.rfpDetails.expectedStartDate).toISOString() : null,
+          probability_of_winning: formData.rfpDetails?.probabilityOfWinning ? parseFloat(formData.rfpDetails.probabilityOfWinning) : null,
+          project_duration: formData.rfpDetails?.projectDuration ? parseInt(formData.rfpDetails.projectDuration) : null,
           opportunity_id: opportunityId,
           rfpDocuments: formData.rfpDocuments || []
         };
@@ -1565,7 +1571,7 @@ const PIPELINE_STATUSES = [
           <TabsContent value="rfp" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Opportunity-RFP Details</CardTitle>
+                <CardTitle>Opportunity-RFP Detailss</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1738,6 +1744,67 @@ const PIPELINE_STATUSES = [
                       onChange={(e) => updateRfpDetails('nextstep', e.target.value)}
                       placeholder="Enter next step..."
                     />
+                  </div>
+
+                  {/* Expected Start Date */}
+                  <div>
+                    <Label htmlFor="expectedStartDate">Expected Start Date</Label>
+                    <Input
+                      id="expectedStartDate"
+                      type="date"
+                      value={formData.rfpDetails.expectedStartDate ? formatDateForInput(formData.rfpDetails.expectedStartDate) : ''}
+                      onChange={(e) => updateRfpDetails('expectedStartDate', e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                  </div>
+
+                  {/* Probability of Winning */}
+                  <div>
+                    <Label htmlFor="probabilityOfWinning">Probability of Winning</Label>
+                    <Input
+                      id="probabilityOfWinning"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={formData.rfpDetails.probabilityOfWinning}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Allow values between 0-100 only
+                        if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 100)) {
+                          updateRfpDetails('probabilityOfWinning', value);
+                        }
+                      }}
+                      placeholder="Enter probability percentage (0-100)"
+                    />
+                  </div>
+
+                  {/* Project Duration */}
+                  <div>
+                    <Label htmlFor="projectDuration">Project Duration</Label>
+                    <Select
+                      value={formData.rfpDetails.projectDuration}
+                      onValueChange={(value) => updateRfpDetails('projectDuration', value)}
+                      disabled={opportunity?.isViewMode}
+                    >
+                      <SelectTrigger className={opportunity?.isViewMode ? 'bg-gray-100' : ''}>
+                        <SelectValue placeholder="Select project duration" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1 Month">1 Month</SelectItem>
+                        <SelectItem value="2 Months">2 Months</SelectItem>
+                        <SelectItem value="3 Months">3 Months</SelectItem>
+                        <SelectItem value="4 Months">4 Months</SelectItem>
+                        <SelectItem value="5 Months">5 Months</SelectItem>
+                        <SelectItem value="6 Months">6 Months</SelectItem>
+                        <SelectItem value="7 Months">7 Months</SelectItem>
+                        <SelectItem value="8 Months">8 Months</SelectItem>
+                        <SelectItem value="9 Months">9 Months</SelectItem>
+                        <SelectItem value="10 Months">10 Months</SelectItem>
+                        <SelectItem value="11 Months">11 Months</SelectItem>
+                        <SelectItem value="12 Months (1 Year)">12 Months (1 Year)</SelectItem>
+                        <SelectItem value="24 Months">24 Months</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Q&A Logs */}

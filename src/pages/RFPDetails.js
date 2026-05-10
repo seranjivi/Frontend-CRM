@@ -111,7 +111,10 @@ const RFPDetails = () => {
             submissionDeadline: updatedRFP.submissionDeadline || updatedRFP.submission_deadline || item.submissionDeadline,
             createdOn: updatedRFP.createdOn || item.createdOn,
             currency: updatedRFP.currency || item.currency || 'USD',
-            amount: updatedRFP.amount || item.amount || 0
+            amount: updatedRFP.amount || item.amount || 0,
+            expectedStartDate: updatedRFP.expectedStartDate || item.expectedStartDate,
+            probabilityOfWinning: updatedRFP.probabilityOfWinning || item.probabilityOfWinning,
+            projectDuration: updatedRFP.projectDuration || item.projectDuration
           };
           return newItem;
         }
@@ -267,7 +270,10 @@ const RFPDetails = () => {
           submissionDeadline: item.submissionDeadline || 'N/A',
           createdOn: item.createdOn || new Date().toISOString().split('T')[0],
           currency: item.currency || 'USD',
-          amount: item.amount || 0
+          amount: item.amount || 0,
+          expectedStartDate: item.expectedStartDate || null,
+          probabilityOfWinning: item.probabilityOfWinning || null,
+          projectDuration: item.projectDuration || null
         }));
         
         setData(formattedData);
@@ -293,19 +299,23 @@ const RFPDetails = () => {
     {
       key: 'opportunityId',
       header: 'Opportunity ID',
+      width: '160px',
     },
     {
       key: 'clientName',
       header: 'Client Name',
       filterable: true,
+      width: '200px',
     },
     {
       key: 'rfpTitle',
       header: 'RFP Title',
+      width: '250px',
     },
     {
       key: 'rfpStatus',
       header: 'RFP Status',
+      width: '150px',
       render: (value) => (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
           value === 'Draft' ? 'bg-yellow-100 text-yellow-800' :
@@ -346,12 +356,32 @@ const RFPDetails = () => {
     {
       key: 'submissionDeadline',
       header: 'Submission Deadline',
+      width: '180px',
       render: (date) => date ? new Date(date).toLocaleDateString() : '-',
     },
     {
       key: 'createdOn',
       header: 'Created On',
+      width: '140px',
       render: (date) => date ? new Date(date).toLocaleDateString() : '-',
+    },
+    {
+      key: 'expectedStartDate',
+      header: 'Expected Start Date',
+      width: '180px',
+      render: (date) => date ? new Date(date).toLocaleDateString() : '-',
+    },
+    {
+      key: 'probabilityOfWinning',
+      header: 'Probability of Winning',
+      width: '200px',
+      render: (value) => value !== null && value !== undefined ? `${value}%` : '-',
+    },
+    {
+      key: 'projectDuration',
+      header: 'Project Duration',
+      width: '180px',
+      render: (value) => value !== null && value !== undefined ? value : '-',
     }
   ];
 
@@ -624,12 +654,12 @@ const RFPDetails = () => {
       <div className="flex justify-between items-center mb-6">
         <div>
           <div className="flex items-center space-x-2">
-            <h1 className="text-2xl font-semibold">Opportunity-RFP Details Portfolio</h1>
+            <h1 className="text-2xl font-semibold whitespace-nowrap">Opportunity-RFP Details Portfolio</h1>
             <span className="text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded-md">
               {loading ? 'Loading...' : `(${data.length} ${data.length === 1 ? 'record' : 'records'})`}
             </span>
           </div>
-          <p className="text-sm text-gray-500">Procurement and Submission Tracking</p>
+          <p className="text-sm text-gray-500">Procurement and Submission Trackingg</p>
         </div>
         <div className="flex items-center space-x-4">
           <Button 
@@ -650,7 +680,7 @@ const RFPDetails = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="bg-white rounded-lg border border-gray-200 p-4 overflow-x-auto">
         <DataTable
           key={JSON.stringify(filteredData.map(item => ({ id: item.id, rfpStatus: item.rfpStatus, rfpTitle: item.rfpTitle })))} // Force re-render when key data changes
           data={filteredData}

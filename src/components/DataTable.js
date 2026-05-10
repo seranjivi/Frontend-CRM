@@ -104,14 +104,15 @@ const DataTable = ({
   return (
     <div className="space-y-4">
 
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border min-w-full">
+        <Table className="min-w-[1200px]">
           <TableHeader>
             <TableRow>
               {columns.map((column) => (
                 <TableHead
                   key={column.key}
                   className={`bg-blue-50 ${column.key !== 'actions' ? 'cursor-pointer hover:bg-blue-100 transition-colors' : ''}`}
+                  style={column.width ? { width: column.width, minWidth: column.width } : {}}
                 >
                   <div className="flex items-center justify-between font-medium text-sm text-gray-900">
                     <div
@@ -144,7 +145,10 @@ const DataTable = ({
               paginatedData.map((item, rowIndex) => (
                 <TableRow key={item.id || rowIndex}>
                   {columns.map((column) => (
-                    <TableCell key={`${item.id || rowIndex}-${column.key}`}>
+                    <TableCell 
+                      key={`${item.id || rowIndex}-${column.key}`}
+                      style={column.width ? { width: column.width, minWidth: column.width } : {}}
+                    >
                       {column.render
                         ? column.render(item[column.key], item)
                         : item[column.key]}
