@@ -301,7 +301,7 @@ const RFPDetails = () => {
     // },
     {
       key: 'opportunityCode',
-      header: 'Id',
+      header: 'OppId',
       width: '180px',
     },
     {
