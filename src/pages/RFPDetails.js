@@ -78,6 +78,7 @@ const RFPDetails = () => {
             ...item,
             id: updatedRFP.id,
             clientName: updatedRFP.clientName || item.clientName,
+            opportunityCode: updatedRFP.opportunityCode || updatedRFP.opportunity_code || updatedRFP.opportunity?.opportunity_code || updatedRFP.opportunity?.opportunity_id || item.opportunityCode,
             opportunityName: updatedRFP.opportunityName || item.opportunityName,
             rfpTitle: updatedRFP.rfpTitle || updatedRFP.title || item.rfpTitle,
             rfpStatus: updatedRFP.status || updatedRFP.rfpStatus || updatedRFP.rfp_status || item.rfpStatus, // Fixed: use 'status' field
@@ -104,6 +105,7 @@ const RFPDetails = () => {
             ...item,
             id: updatedRFP.id,
             clientName: updatedRFP.clientName || item.clientName,
+            opportunityCode: updatedRFP.opportunityCode || updatedRFP.opportunity_code || updatedRFP.opportunity?.opportunity_code || updatedRFP.opportunity?.opportunity_id || item.opportunityCode,
             opportunityName: updatedRFP.opportunityName || item.opportunityName,
             rfpTitle: updatedRFP.rfpTitle || updatedRFP.title || item.rfpTitle,
             rfpStatus: updatedRFP.status || updatedRFP.rfpStatus || updatedRFP.rfp_status || item.rfpStatus,
@@ -262,6 +264,7 @@ const RFPDetails = () => {
         const formattedData = responseData.map(item => ({
           id: item.id,
           opportunityId: item.opportunity?.id || item.opportunityId || 'N/A',
+          opportunityCode: item.opportunityCode || item.opportunity_code || item.opportunity?.opportunity_code || item.opportunity?.opportunity_id || 'N/A',
           clientName: item.clientName || item.opportunity?.client_name || 'N/A',
           opportunityName: item.opportunityName || 'N/A',
           rfpTitle: item.rfpTitle || 'N/A',
@@ -297,9 +300,9 @@ const RFPDetails = () => {
     //   header: 'Opportunity Name',
     // },
     {
-      key: 'opportunityId',
-      header: 'Opportunity ID',
-      width: '160px',
+      key: 'opportunityCode',
+      header: 'Opportunity Code',
+      width: '180px',
     },
     {
       key: 'clientName',
